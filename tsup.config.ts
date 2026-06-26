@@ -12,6 +12,9 @@ export default defineConfig({
   minify: false,
   esbuildOptions(options) {
     options.jsx = 'automatic';
+    options.banner = {
+      js: '"use client";',
+    };
   },
   loader: {
     '.svg': 'dataurl',
