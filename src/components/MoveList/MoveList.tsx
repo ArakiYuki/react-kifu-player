@@ -14,20 +14,22 @@ export function MoveList(props: MoveListProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLDivElement>(null);
 
-  // 現在手にスクロール
+  // 現在手にスクロール（コンテナ内のみ、ページスクロールは発生させない）
   useEffect(() => {
     if (activeRef.current && listRef.current) {
       const container = listRef.current;
       const active = activeRef.current;
-      const containerRect = container.getBoundingClientRect();
-      const activeRect = active.getBoundingClientRect();
 
-      // アクティブ要素がコンテナの表示範囲外にある場合のみスクロール
-      if (
-        activeRect.top < containerRect.top ||
-        activeRect.bottom > containerRect.bottom
-      ) {
-        active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      // offsetTop はコンテナ（position:relative）からの相対位置なのでそのまま使える
+      const activeTop = active.offsetTop;
+      const activeBottom = activeTop + active.offsetHeight;
+      const scrollTop = container.scrollTop;
+      const visibleBottom = scrollTop + container.clientHeight;
+
+      if (activeTop < scrollTop) {
+        container.scrollTop = activeTop;
+      } else if (activeBottom > visibleBottom) {
+        container.scrollTop = activeBottom - container.clientHeight;
       }
     }
   }, [currentPly]);
@@ -46,6 +48,7 @@ export function MoveList(props: MoveListProps) {
         overflowY: 'auto',
         maxHeight: 400,
         padding: '4px 0',
+        position: 'relative',
       }}
     >
       {/* 開始局面 */}
@@ -145,23 +148,6 @@ function MoveItem({
       {/* 指し手テキスト */}
       <span style={{ fontWeight: isActive ? 600 : 400 }}>{label}</span>
 
-      {/* コメント */}
-      {comment && (
-        <span
-          style={{
-            color: theme.commentColor,
-            fontSize: theme.fontSize - 2,
-            marginLeft: 'auto',
-            maxWidth: '50%',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={comment}
-        >
-          {comment}
-        </span>
-      )}
     </div>
   );
 }

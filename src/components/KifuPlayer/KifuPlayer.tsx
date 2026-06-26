@@ -55,8 +55,6 @@ export function KifuPlayer(props: KifuPlayerProps) {
   // メインhook
   const player = useKifuPlayer(kifu, {
     initialPly,
-    evaluations: externalEvals,
-    candidates: externalCandidates,
     onPlyChange,
   });
 

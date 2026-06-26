@@ -155,9 +155,9 @@ export type Candidate = {
   /** 評価値 */
   score: number;
   /** 探索深さ */
-  depth: number;
+  depth?: number;
   /** 探索ノード数 */
-  nodes: number;
+  nodes?: number;
   /** 読み筋 (USI or KIF形式の文字列) */
   readMoves: string;
   /** 表示用に整形された読み筋 */
@@ -343,6 +343,10 @@ export type ShogiBoardProps = {
   boardTheme?: BoardTheme;
   pieceTheme?: PieceTheme;
   handTheme?: HandTheme;
+  /** 盤面を反転するか（後手側視点） */
+  reversed?: boolean;
+  /** 盤面反転ボタンを盤面右上に表示するか */
+  showReverseButton?: boolean;
   /** 最終手の座標 (ハイライト用) */
   lastMove?: { from: Coordinate | null; to: Coordinate };
   /** 盤面右半分クリック時 (進む) */

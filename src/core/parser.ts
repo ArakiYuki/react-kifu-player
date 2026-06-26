@@ -19,6 +19,7 @@ import {
   RecordMetadataKey,
   getBlackPlayerName,
   getWhitePlayerName,
+  parsePV,
 } from 'tsshogi';
 
 import type {
@@ -34,6 +35,9 @@ import type {
   Move,
   Coordinate,
   KifuFormat,
+  EvaluationPoint,
+  Candidate,
+  CandidatesMap,
 } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -272,8 +276,7 @@ export function detectFormat(kifu: string): KifuFormat {
   return 'unknown';
 }
 
-/** 棋譜文字列をパースして GameRecord を返す */
-export function parseKifu(kifuString: string): GameRecord {
+export function getTsshogiRecord(kifuString: string): TsshogiRecord {
   const normalized = kifuString.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
   const format = detectFormat(normalized);
 
@@ -306,6 +309,14 @@ export function parseKifu(kifuString: string): GameRecord {
     throw new Error(`棋譜のパースに失敗しました: ${record.message}`);
   }
 
+  return record;
+}
+
+/** 棋譜文字列をパースして GameRecord を返す */
+export function parseKifu(kifuString: string): GameRecord {
+  const record = getTsshogiRecord(kifuString);
+  const format = detectFormat(kifuString);
+
   return {
     header: extractHeader(record),
     moves: buildMoveNodes(record),
@@ -334,4 +345,158 @@ function tryAllParsers(kifu: string): TsshogiRecord | Error {
   }
 
   return lastError || new Error('No parser could handle the input');
+}
+
+// ---------------------------------------------------------------------------
+// Engine Data Extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * GameRecord から、各手数のエンジン解析コメント（ShogiGUI等のフォーマット）
+ * をパースして評価値と候補手データを抽出します。
+ */
+export function extractEngineDataFromRecord(record: GameRecord): {
+  evaluations: EvaluationPoint[];
+  candidates: CandidatesMap;
+} {
+  const evaluations: EvaluationPoint[] = [];
+  const candidates: CandidatesMap = new Map();
+
+  // 評価値ありのパターン
+  const regexWithScore = /\*?解析(?:.*?候補(\d+))?.*?評価値\s+([+-]?)(詰)?\s*(-?\d+).*?読み筋\s+(.*)/;
+  // 評価値なし、読み筋のみのパターン
+  const regexNoScore = /\*?解析(?:.*?候補(\d+)).*?読み筋\s+(.*)/;
+
+  for (const node of record.moves) {
+    if (!node.comment) continue;
+    
+    const lines = node.comment.split('\n');
+    const remainingLines: string[] = [];
+    const plyCandidates: Candidate[] = [];
+    let topEvaluation: EvaluationPoint | null = null;
+    const ply = node.ply;
+
+    for (const line of lines) {
+      // エンジンに関するヘッダーコメント（*Engines 0 dlshogi 等）も除外する
+      if (line.match(/^\*?Engines/)) {
+        continue;
+      }
+
+      const matchWithScore = line.match(regexWithScore);
+      if (matchWithScore) {
+        const candidateId = matchWithScore[1] ? parseInt(matchWithScore[1], 10) : 1;
+        const sign = matchWithScore[2]; // '', '+', '-'
+        const isMate = matchWithScore[3] === '詰';
+        const val = parseInt(matchWithScore[4], 10);
+        
+        let score: number | null = null;
+        let mate: number | null = null;
+        
+        if (isMate) {
+          mate = (sign === '-') ? -val : val;
+        } else {
+          score = (sign === '-') ? -val : val;
+          // dlshogi等の場合、絶対値が大きすぎる(30000等)と実質詰み
+          if (score && Math.abs(score) >= 29000) {
+            mate = score > 0 ? 1 : -1;
+            score = null;
+          }
+        }
+        
+        const readMoves = matchWithScore[5].trim();
+
+        const cand: Candidate = {
+          id: candidateId,
+          score: score ?? (mate ? mate * 30000 : 0),
+          readMoves,
+          formattedMoves: readMoves, // 将来的に変換可能
+        };
+        plyCandidates.push(cand);
+
+        if (candidateId === 1 || !topEvaluation) {
+          topEvaluation = {
+            ply,
+            score: score ?? (mate ? mate * 30000 : 0),
+            mate: mate ?? null,
+          };
+        }
+        continue;
+      }
+
+      // 評価値なしだが候補手+読み筋ありの行
+      const matchNoScore = line.match(regexNoScore);
+      if (matchNoScore) {
+        const candidateId = matchNoScore[1] ? parseInt(matchNoScore[1], 10) : 1;
+        const readMoves = matchNoScore[2].trim();
+        
+        const cand: Candidate = {
+          id: candidateId,
+          score: 0,
+          readMoves,
+          formattedMoves: readMoves,
+        };
+        plyCandidates.push(cand);
+        continue;
+      }
+
+      // 解析行っぽいもの（*解析 で始まる行）も除外
+      if (line.match(/^\*?解析/)) {
+        continue;
+      }
+
+      remainingLines.push(line);
+    }
+
+    // コメントを上書きして、人間のコメントのみにする
+    node.comment = remainingLines.join('\n').trim() || null;
+
+    if (plyCandidates.length > 0) {
+      // 候補ID順にソート
+      plyCandidates.sort((a, b) => a.id - b.id);
+      candidates.set(ply, plyCandidates);
+    }
+
+    if (topEvaluation) {
+      evaluations.push(topEvaluation);
+    }
+  }
+
+  return {
+    evaluations,
+    candidates,
+  };
+}
+
+/**
+ * 分岐の指し手文字列（例: "△同　歩(85) ▲同　飛(88)"）をパースし、
+ * 一時的な分岐用の MoveNode 配列を生成します。
+ */
+export function parseVariationMoves(kifuString: string, sourcePly: number, pvStr: string): MoveNode[] {
+  const record = getTsshogiRecord(kifuString);
+  record.goto(sourcePly);
+  
+  const moves = parsePV(record.position, pvStr);
+  if (moves instanceof Error) {
+    console.warn('Failed to parse variation:', moves.message);
+    return [];
+  }
+
+  const nodes: MoveNode[] = [];
+  let currentPly = sourcePly;
+  
+  for (const move of moves) {
+    currentPly++;
+    // Move を Record に適用して ImmutableNode から抽出する
+    record.append(move);
+    const node = toMove(record.current);
+    nodes.push({
+      ply: currentPly,
+      move: node,
+      comment: null,
+      timeSpent: null,
+      branches: [],
+    });
+  }
+
+  return nodes;
 }

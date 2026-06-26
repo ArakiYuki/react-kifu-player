@@ -1,139 +1,282 @@
 import React, { useState } from 'react';
-import { KifuPlayer } from 'react-kifu-player';
+import { 
+  useKifuPlayer, 
+  ShogiBoard, 
+  ControlBar, 
+  MoveList, 
+  EvalGraph, 
+  CandidateList,
+  ThemeProvider,
+  resolveTheme,
+} from 'react-kifu-player';
 
-// サンプル棋譜 (KIF形式)
-const SAMPLE_KIF = `手合割：平手
-先手：藤井聡太
-後手：渡辺明
-手数----指手---------消費時間--
-   1 ７六歩(77)   ( 0:01/00:00:01)
-   2 ３四歩(33)   ( 0:01/00:00:01)
-   3 ２六歩(27)   ( 0:01/00:00:02)
-   4 ８四歩(83)   ( 0:01/00:00:02)
-   5 ２五歩(26)   ( 0:01/00:00:03)
-   6 ８五歩(84)   ( 0:01/00:00:03)
-   7 ７八金(69)   ( 0:01/00:00:04)
-   8 ３二金(41)   ( 0:01/00:00:04)
-   9 ２四歩(25)   ( 0:02/00:00:06)
-  10 同　歩(23)   ( 0:01/00:00:05)
-  11 同　飛(28)   ( 0:01/00:00:07)
-  12 ２三歩打     ( 0:01/00:00:06)
-  13 ２六飛(24)   ( 0:01/00:00:08)
-  14 ８六歩(85)   ( 0:01/00:00:07)
-  15 同　歩(87)   ( 0:01/00:00:09)
-  16 同　飛(82)   ( 0:01/00:00:08)
-  17 ８七歩打     ( 0:01/00:00:10)
-  18 ８二飛(86)   ( 0:01/00:00:09)
-  19 ６八銀(79)   ( 0:01/00:00:11)
-  20 ６二銀(71)   ( 0:01/00:00:10)
-`;
+// 実データをロード (Viteの?rawインポートを利用)
+import SAMPLE_KIF from '../demo.kifu?raw';
 
 function App() {
-  const [theme, setTheme] = useState<'text' | 'rich'>('rich');
-  const [currentPly, setCurrentPly] = useState(0);
+  const [themeName, setThemeName] = useState<'text' | 'rich'>('rich');
+  const theme = resolveTheme(themeName);
+  
+  // Headless UI パターン：フックから状態と操作を取得する
+  // KIFコメント内の解析データが自動抽出されます
+  const player = useKifuPlayer(SAMPLE_KIF);
+
+  // キーボード操作での手数移動
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Input要素などの編集中は無効化
+      if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+        return;
+      }
+      
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        player.forward();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        player.backward();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [player]);
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#1a1a2e',
-      color: '#e0e0e0',
-      fontFamily: '"Noto Sans JP", system-ui, sans-serif',
-      padding: 32,
-    }}>
-      {/* ヘッダー */}
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <h1 style={{
-          fontSize: 28,
-          fontWeight: 700,
-          background: 'linear-gradient(135deg, #f5d0a9, #e8a87c)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          marginBottom: 8,
-        }}>
-          react-kifu-player
-        </h1>
-        <p style={{ fontSize: 14, color: '#888' }}>
-          リッチな将棋棋譜再生Reactコンポーネントライブラリ
-        </p>
-      </div>
-
-      {/* テーマ切替 */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 24 }}>
-        <button
-          onClick={() => setTheme('text')}
-          style={{
-            padding: '8px 20px',
-            border: theme === 'text' ? '2px solid #e8a87c' : '2px solid #444',
-            borderRadius: 8,
-            background: theme === 'text' ? 'rgba(232,168,124,0.15)' : 'transparent',
-            color: theme === 'text' ? '#e8a87c' : '#888',
-            cursor: 'pointer',
-            fontSize: 14,
-            fontWeight: 600,
-            transition: 'all 0.2s',
-          }}
-        >
-          テキストテーマ
-        </button>
-        <button
-          onClick={() => setTheme('rich')}
-          style={{
-            padding: '8px 20px',
-            border: theme === 'rich' ? '2px solid #e8a87c' : '2px solid #444',
-            borderRadius: 8,
-            background: theme === 'rich' ? 'rgba(232,168,124,0.15)' : 'transparent',
-            color: theme === 'rich' ? '#e8a87c' : '#888',
-            cursor: 'pointer',
-            fontSize: 14,
-            fontWeight: 600,
-            transition: 'all 0.2s',
-          }}
-        >
-          リッチテーマ
-        </button>
-      </div>
-
-      {/* 手数表示 */}
-      <div style={{ textAlign: 'center', marginBottom: 16, fontSize: 13, color: '#666' }}>
-        現在の手数: {currentPly} (← → キーで操作可能)
-      </div>
-
-      {/* メインプレーヤー */}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <div style={{
-          background: '#252540',
-          borderRadius: 16,
-          padding: 24,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-          maxWidth: 680,
-          width: '100%',
-        }}>
-          <KifuPlayer
-            kifu={SAMPLE_KIF}
-            theme={theme}
-            showMoveList={true}
-            showControlBar={true}
-            onPlyChange={setCurrentPly}
-          />
+    <ThemeProvider value={theme}>
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#1a1a2e',
+        color: '#e0e0e0',
+        fontFamily: '"Noto Sans JP", system-ui, sans-serif',
+        padding: 32,
+      }}>
+        {/* ヘッダー */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <h1 style={{
+            fontSize: 28,
+            fontWeight: 700,
+            background: 'linear-gradient(135deg, #f5d0a9, #e8a87c)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            marginBottom: 8,
+          }}>
+            react-kifu-player (Headless UI Demo)
+          </h1>
+          <p style={{ fontSize: 14, color: '#888' }}>
+            状態（Hook）と見た目（Component）を分離して自由にレイアウトするデモ
+          </p>
         </div>
-      </div>
 
-      {/* 使い方サンプルコード */}
-      <div style={{ textAlign: 'center', marginTop: 40, fontSize: 13, color: '#555' }}>
-        <code style={{
-          background: '#252540',
-          padding: '12px 24px',
-          borderRadius: 8,
-          display: 'inline-block',
-          fontFamily: 'monospace',
-          color: '#aaa',
+        {/* コントロール群 (テーマ切替・盤面反転) */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setThemeName('text')}
+              style={{
+                padding: '8px 20px',
+                border: themeName === 'text' ? '2px solid #e8a87c' : '2px solid #444',
+                borderRadius: 8,
+                background: themeName === 'text' ? 'rgba(232,168,124,0.15)' : 'transparent',
+                color: themeName === 'text' ? '#e8a87c' : '#888',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+              }}
+            >
+              Text Theme
+            </button>
+            <button
+              onClick={() => setThemeName('rich')}
+              style={{
+                padding: '8px 20px',
+                border: themeName === 'rich' ? '2px solid #e8a87c' : '2px solid #444',
+                borderRadius: 8,
+                background: themeName === 'rich' ? 'rgba(232,168,124,0.15)' : 'transparent',
+                color: themeName === 'rich' ? '#e8a87c' : '#888',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+              }}
+            >
+              Rich Theme
+            </button>
+          </div>
+        </div>
+
+        <div style={{ 
+          maxWidth: 1200, 
+          margin: '0 auto',
+          display: 'flex',
+          gap: 32,
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
         }}>
-          {`import { KifuPlayer } from 'react-kifu-player';`}
-          <br />
-          {`<KifuPlayer kifu={kifuString} theme="rich" />`}
-        </code>
+          {/* 左カラム: 盤面と操作ボタン */}
+          <div style={{ flex: '0 0 auto', width: 460 }}>
+            <div style={{
+              background: '#252540',
+              borderRadius: 12,
+              padding: 16,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            }}>
+              <ShogiBoard 
+                position={player.position}
+                lastMove={player.lastMoveCoords || undefined}
+                onForward={player.forward}
+                onBackward={player.backward}
+                showReverseButton={true}
+                playerNameSente={player.header?.blackName ? `☗${player.header.blackName}` : undefined}
+                playerNameGote={player.header?.whiteName ? `☖${player.header.whiteName}` : undefined}
+              />
+              <div style={{ marginTop: 12 }}>
+                <ControlBar
+                  currentPly={player.currentPly}
+                  totalPlies={player.totalPlies}
+                  onForward={player.forward}
+                  onBackward={player.backward}
+                  onGoToStart={player.goToStart}
+                  onGoToEnd={player.goToEnd}
+                />
+              </div>
+
+              {/* コメント表示欄 */}
+              <div style={{
+                marginTop: 16,
+                padding: '12px 16px',
+                background: '#1a1a2e',
+                border: '1px solid #444',
+                borderRadius: 8,
+                height: 100,
+                overflowY: 'auto',
+                fontSize: 14,
+                lineHeight: 1.6,
+                color: '#e0e0e0',
+              }}>
+                {player.currentComment ? (
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{player.currentComment}</div>
+                ) : (
+                  <div style={{ color: '#666', fontStyle: 'italic' }}>コメントはありません</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 右カラム: 評価値・候補手・棋譜リスト */}
+          <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            {/* 評価値グラフ */}
+            <div style={{
+              background: '#252540',
+              borderRadius: 12,
+              padding: 16,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              flexShrink: 0,
+            }}>
+              <div style={{ fontSize: 13, color: '#aaa', marginBottom: 8, fontWeight: 'bold' }}>評価値グラフ</div>
+              <EvalGraph 
+                data={player.evaluations}
+                currentPly={player.currentPly}
+                onPlyClick={player.goto}
+                branchData={player.variationEval ? [player.variationEval] : undefined}
+              />
+            </div>
+
+            {/* 候補手リスト / 分岐再生中の情報 */}
+            <div style={{
+              background: '#252540',
+              borderRadius: 12,
+              padding: 16,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              height: 200,
+              flexShrink: 0,
+              overflow: 'auto',
+            }}>
+              {player.isOnBranch ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  gap: 10,
+                }}>
+                  <div style={{ 
+                    fontSize: 15, 
+                    fontWeight: 'bold', 
+                    color: '#ff6b6b',
+                    letterSpacing: 1,
+                  }}>
+                    📖 読み筋再生中
+                  </div>
+                  <div style={{ fontSize: 13, color: '#aaa' }}>
+                    {player.branchSourcePly}手目から分岐
+                  </div>
+                  {player.variationEval && (
+                    <div style={{ fontSize: 14, color: '#e0e0e0' }}>
+                      評価値: <span style={{ 
+                        fontWeight: 'bold',
+                        color: player.variationEval.score > 300 ? '#d32f2f' 
+                             : player.variationEval.score < -300 ? '#1976d2' 
+                             : '#e0e0e0'
+                      }}>
+                        {player.variationEval.score > 0 ? '+' : ''}{player.variationEval.score}
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    onClick={player.returnToMainLine}
+                    style={{
+                      marginTop: 8,
+                      padding: '8px 24px',
+                      background: '#d32f2f',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: 14,
+                      boxShadow: '0 4px 12px rgba(211,47,47,0.4)',
+                      transition: 'transform 0.1s',
+                    }}
+                  >
+                    本譜に戻る
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 13, color: '#aaa', marginBottom: 8, fontWeight: 'bold' }}>AI候補手</div>
+                  <CandidateList 
+                    candidates={player.candidates} 
+                    onCandidateClick={(c) => player.playVariation(c.readMoves, c.score)}
+                  />
+                </>
+              )}
+            </div>
+
+            {/* 棋譜リスト */}
+            <div style={{
+              background: '#252540',
+              borderRadius: 12,
+              padding: 16,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              flex: 1,
+              minHeight: 200,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}>
+              <div style={{ fontSize: 13, color: '#aaa', marginBottom: 8, fontWeight: 'bold' }}>棋譜リスト</div>
+              <div style={{ flex: 1, border: `1px solid ${theme.moveList.highlightColor}`, borderRadius: 4, overflow: 'hidden' }}>
+                <MoveList 
+                  moves={player.moves}
+                  currentPly={player.currentPly}
+                  onPlyClick={player.goto}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
-    </div>
+    </ThemeProvider>
   );
 }
 

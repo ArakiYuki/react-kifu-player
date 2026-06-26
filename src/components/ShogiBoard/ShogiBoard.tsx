@@ -89,7 +89,7 @@ function BoardGrid({ theme }: { theme: BoardTheme }) {
 }
 
 /** 盤面のラベル (筋・段) を描画 */
-function BoardLabels({ theme }: { theme: BoardTheme }) {
+function BoardLabels({ theme, reversed }: { theme: BoardTheme; reversed?: boolean }) {
   if (!theme.showLabels) return null;
 
   const labels: React.ReactNode[] = [];
@@ -97,6 +97,7 @@ function BoardLabels({ theme }: { theme: BoardTheme }) {
 
   // 筋ラベル (上)
   for (let i = 0; i < BOARD_CELLS; i++) {
+    const text = reversed ? FILE_LABELS[8 - i] : FILE_LABELS[i];
     labels.push(
       <text
         key={`file-${i}`}
@@ -107,13 +108,14 @@ function BoardLabels({ theme }: { theme: BoardTheme }) {
         fill={theme.labelColor}
         fontFamily="system-ui, sans-serif"
       >
-        {FILE_LABELS[i]}
+        {text}
       </text>
     );
   }
 
   // 段ラベル (右)
   for (let i = 0; i < BOARD_CELLS; i++) {
+    const text = reversed ? RANK_LABELS[8 - i] : RANK_LABELS[i];
     labels.push(
       <text
         key={`rank-${i}`}
@@ -124,7 +126,7 @@ function BoardLabels({ theme }: { theme: BoardTheme }) {
         fill={theme.labelColor}
         fontFamily="system-ui, sans-serif"
       >
-        {RANK_LABELS[i]}
+        {text}
       </text>
     );
   }
@@ -273,6 +275,7 @@ function HandDisplay({
   x,
   y,
   height,
+  isBottom,
 }: {
   hand: HandPieces;
   color: Color;
@@ -281,72 +284,70 @@ function HandDisplay({
   x: number;
   y: number;
   height: number;
+  isBottom?: boolean;
 }) {
   const isGote = color === 'white';
   const pieces: React.ReactNode[] = [];
 
-  const label = isGote ? '☖後手' : '☗先手';
-  let offsetY = isGote ? 20 : 24;
-
-  pieces.push(
-    <text
-      key="label"
-      x={x + HAND_WIDTH / 2}
-      y={y + offsetY}
-      textAnchor="middle"
-      fontSize={handTheme.fontSize - 1}
-      fontWeight="bold"
-      fill={handTheme.textColor}
-      fontFamily="'Noto Sans JP', system-ui, sans-serif"
-    >
-      {label}
-    </text>
-  );
-
-  offsetY += 22;
-
+  const labelText = isGote ? '☖後手' : '☗先手';
+  
+  // 描画方向 (isBottomがtrueなら下から上へ)
+  const drawItems = [];
+  
   for (const kind of HAND_ORDER) {
     const count = hand[kind];
     if (!count || count <= 0) continue;
 
     const displayChar = PIECE_DISPLAY[kind as PieceKind] || '?';
     const countStr = count > 1 ? KANJI_NUMS[count] : '';
-
-    pieces.push(
-      <text
-        key={kind}
-        x={x + HAND_WIDTH / 2}
-        y={y + offsetY}
-        textAnchor="middle"
-        fontSize={handTheme.fontSize}
-        fill={handTheme.textColor}
-        fontFamily={theme.fontFamily}
-      >
-        {displayChar}{countStr}
-      </text>
-    );
-
-    offsetY += 20;
+    drawItems.push(`${displayChar}${countStr}`);
   }
 
-  // 持ち駒がない場合
-  const hasAny = HAND_ORDER.some(k => hand[k] && hand[k]! > 0);
+  const hasAny = drawItems.length > 0;
   if (!hasAny) {
+    drawItems.push('なし');
+  }
+
+  // Y座標の計算
+  let currentY = isBottom ? height - 20 : 20;
+  const direction = isBottom ? -22 : 22;
+
+  // ラベルを描画
+  pieces.push(
+    <text
+      key="label"
+      x={x + HAND_WIDTH / 2}
+      y={y + currentY}
+      textAnchor="middle"
+      fontSize={handTheme.fontSize - 1}
+      fontWeight="bold"
+      fill={handTheme.textColor}
+      fontFamily="'Noto Sans JP', system-ui, sans-serif"
+    >
+      {labelText}
+    </text>
+  );
+
+  currentY += direction;
+
+  // 駒を描画
+  drawItems.forEach((item, index) => {
     pieces.push(
       <text
-        key="none"
+        key={index}
         x={x + HAND_WIDTH / 2}
-        y={y + offsetY}
+        y={y + currentY}
         textAnchor="middle"
-        fontSize={handTheme.fontSize - 2}
+        fontSize={item === 'なし' ? handTheme.fontSize - 2 : handTheme.fontSize}
         fill={handTheme.textColor}
-        opacity={0.5}
-        fontFamily="system-ui, sans-serif"
+        opacity={item === 'なし' ? 0.5 : 1}
+        fontFamily={item === 'なし' ? "system-ui, sans-serif" : theme.fontFamily}
       >
-        なし
+        {item}
       </text>
     );
-  }
+    currentY += direction;
+  });
 
   return <g>{pieces}</g>;
 }
@@ -356,25 +357,36 @@ function HandDisplay({
 // ---------------------------------------------------------------------------
 
 /** SVGベースの将棋盤面コンポーネント */
-export function ShogiBoard(props: ShogiBoardProps) {
+export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; playerNameGote?: string }) {
   const contextTheme = useKifuTheme();
   const boardTheme = props.boardTheme || contextTheme.board;
   const pieceTheme = props.pieceTheme || contextTheme.piece;
   const handTheme = props.handTheme || contextTheme.hand;
 
-  const { position, lastMove, onForward, onBackward, className } = props;
+  const { position, lastMove, onForward, onBackward, className, showReverseButton, playerNameSente, playerNameGote } = props;
+  
+  const [internalReversed, setInternalReversed] = React.useState(false);
+  const isReversed = props.reversed ?? internalReversed;
+
+  // 対局者名表示エリアの高さ
+  const NAME_AREA_HEIGHT = (playerNameSente || playerNameGote) ? 28 : 0;
 
   const boardPixels = CELL_SIZE * BOARD_CELLS;
   const totalWidth = HAND_WIDTH + LABEL_MARGIN + boardPixels + LABEL_MARGIN + HAND_WIDTH;
-  const totalHeight = LABEL_MARGIN + boardPixels + LABEL_MARGIN;
+  const totalHeight = NAME_AREA_HEIGHT + LABEL_MARGIN + boardPixels + LABEL_MARGIN + NAME_AREA_HEIGHT;
 
   // 盤面の開始位置
   const boardX = HAND_WIDTH + LABEL_MARGIN;
-  const boardY = LABEL_MARGIN;
+  const boardY = NAME_AREA_HEIGHT + LABEL_MARGIN;
 
   // クリックイベントのハンドリング
   const handleClick = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!onForward && !onBackward) return;
+    
+    // 反転ボタンがクリックされた場合は何もしない
+    if ((e.target as Element).closest?.('.reverse-btn')) {
+      return;
+    }
     
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
@@ -387,6 +399,10 @@ export function ShogiBoard(props: ShogiBoardProps) {
       onBackward?.();
     }
   };
+
+  // 上下のプレイヤー名
+  const topPlayerName = isReversed ? playerNameSente : playerNameGote;
+  const bottomPlayerName = isReversed ? playerNameGote : playerNameSente;
 
   return (
     <svg
@@ -409,73 +425,130 @@ export function ShogiBoard(props: ShogiBoardProps) {
         strokeWidth={boardTheme.borderWidth}
       />
 
+      {/* 対局者名 (上部) */}
+      {topPlayerName && (
+        <text
+          x={boardX}
+          y={18}
+          fontSize={15}
+          fontWeight="bold"
+          fill={handTheme.textColor}
+          fontFamily="'Noto Sans JP', system-ui, sans-serif"
+        >
+          {topPlayerName}
+        </text>
+      )}
+
+      {/* 対局者名 (下部) */}
+      {bottomPlayerName && (
+        <text
+          x={boardX + boardPixels}
+          y={totalHeight - 8}
+          textAnchor="end"
+          fontSize={15}
+          fontWeight="bold"
+          fill={handTheme.textColor}
+          fontFamily="'Noto Sans JP', system-ui, sans-serif"
+        >
+          {bottomPlayerName}
+        </text>
+      )}
+
       {/* 盤面グリッド・駒 のグループ */}
       <g transform={`translate(${boardX}, ${boardY})`}>
-        {/* ハイライト (最終手) */}
-        {lastMove && (
-          <>
-            {lastMove.from && (
+        <g transform={isReversed ? `rotate(180, ${boardPixels / 2}, ${boardPixels / 2})` : undefined}>
+          {/* ハイライト (最終手) */}
+          {lastMove && (
+            <>
+              {lastMove.from && (
+                <HighlightSquare
+                  x={(9 - lastMove.from.x) * CELL_SIZE}
+                  y={(lastMove.from.y - 1) * CELL_SIZE}
+                  color={boardTheme.highlightColor}
+                  cellSize={CELL_SIZE}
+                />
+              )}
               <HighlightSquare
-                x={(9 - lastMove.from.x) * CELL_SIZE}
-                y={(lastMove.from.y - 1) * CELL_SIZE}
+                x={(9 - lastMove.to.x) * CELL_SIZE}
+                y={(lastMove.to.y - 1) * CELL_SIZE}
                 color={boardTheme.highlightColor}
                 cellSize={CELL_SIZE}
               />
-            )}
-            <HighlightSquare
-              x={(9 - lastMove.to.x) * CELL_SIZE}
-              y={(lastMove.to.y - 1) * CELL_SIZE}
-              color={boardTheme.highlightColor}
-              cellSize={CELL_SIZE}
-            />
-          </>
-        )}
+            </>
+          )}
 
-        {/* 罫線 */}
-        <BoardGrid theme={boardTheme} />
+          {/* 罫線 */}
+          <BoardGrid theme={boardTheme} />
 
-        {/* ラベル */}
-        <BoardLabels theme={boardTheme} />
+          {/* 駒 */}
+          {position.board.map((row, rowIdx) =>
+            row.map((square, colIdx) => {
+              if (!square) return null;
+              return (
+                <PieceCell
+                  key={`${rowIdx}-${colIdx}`}
+                  piece={square}
+                  x={colIdx * CELL_SIZE}
+                  y={rowIdx * CELL_SIZE}
+                  theme={pieceTheme}
+                  cellSize={CELL_SIZE}
+                />
+              );
+            })
+          )}
+        </g>
 
-        {/* 駒 */}
-        {position.board.map((row, rowIdx) =>
-          row.map((square, colIdx) => {
-            if (!square) return null;
-            return (
-              <PieceCell
-                key={`${rowIdx}-${colIdx}`}
-                piece={square}
-                x={colIdx * CELL_SIZE}
-                y={rowIdx * CELL_SIZE}
-                theme={pieceTheme}
-                cellSize={CELL_SIZE}
-              />
-            );
-          })
-        )}
+        {/* ラベル (ラベルは回転させないため別処理) */}
+        <BoardLabels theme={boardTheme} reversed={isReversed} />
       </g>
 
-      {/* 後手持ち駒 (左上) */}
+      {/* 後手持ち駒 */}
       <HandDisplay
         hand={position.handWhite}
         color="white"
         theme={pieceTheme}
         handTheme={handTheme}
-        x={0}
+        x={isReversed ? boardX + boardPixels + LABEL_MARGIN : 0}
         y={boardY}
         height={boardPixels}
+        isBottom={isReversed}
       />
 
-      {/* 先手持ち駒 (右下) */}
+      {/* 先手持ち駒 */}
       <HandDisplay
         hand={position.handBlack}
         color="black"
         theme={pieceTheme}
         handTheme={handTheme}
-        x={boardX + boardPixels + LABEL_MARGIN}
+        x={isReversed ? 0 : boardX + boardPixels + LABEL_MARGIN}
         y={boardY}
         height={boardPixels}
+        isBottom={!isReversed}
       />
+      
+      {/* 盤面反転ボタン */}
+      {showReverseButton && (
+        <g 
+          className="reverse-btn"
+          transform={`translate(${totalWidth - 36}, 8)`} 
+          onClick={(e) => {
+            e.stopPropagation();
+            setInternalReversed(prev => !prev);
+          }}
+          style={{ cursor: 'pointer' }}
+        >
+          <rect width="28" height="28" rx="6" fill={handTheme.background} stroke={handTheme.borderColor} strokeWidth="1" />
+          <text 
+            x="14" y="14" 
+            textAnchor="middle" dominantBaseline="central" 
+            fontSize="14" fill={handTheme.textColor}
+            transform={isReversed ? 'rotate(180, 14, 14)' : undefined}
+            style={{ transition: 'transform 0.3s' }}
+          >
+            🔃
+          </text>
+        </g>
+      )}
     </svg>
   );
 }

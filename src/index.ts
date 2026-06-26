@@ -9,6 +9,8 @@ export { KifuPlayer } from './components/KifuPlayer/KifuPlayer';
 export { ShogiBoard } from './components/ShogiBoard/ShogiBoard';
 export { ControlBar } from './components/ControlBar/ControlBar';
 export { MoveList } from './components/MoveList/MoveList';
+export { EvalGraph } from './components/EvalGraph/EvalGraph';
+export { CandidateList } from './components/CandidateList/CandidateList';
 
 // ---------------------------------------------------------------------------
 // Hooks
@@ -21,7 +23,11 @@ export type { UseKeyboardNavOptions } from './hooks/useKeyboardNav';
 // ---------------------------------------------------------------------------
 // Core utilities
 // ---------------------------------------------------------------------------
-export { parseKifu, detectFormat } from './core/parser';
+export { 
+  parseKifu, 
+  detectFormat,
+  extractEngineDataFromRecord 
+} from './core/parser';
 
 // ---------------------------------------------------------------------------
 // Theme system
