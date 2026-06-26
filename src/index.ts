@@ -35,6 +35,9 @@ export {
 export {
   textTheme,
   richTheme,
+  imageWoodTheme,
+  imageDarkTheme,
+  imageGlassTheme,
   registerTheme,
   getTheme,
   getThemeNames,

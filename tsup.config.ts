@@ -13,4 +13,7 @@ export default defineConfig({
   esbuildOptions(options) {
     options.jsx = 'automatic';
   },
+  loader: {
+    '.svg': 'dataurl',
+  },
 });

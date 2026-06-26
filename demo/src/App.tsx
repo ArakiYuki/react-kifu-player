@@ -14,12 +14,14 @@ import {
 import SAMPLE_KIF from '../demo.kifu?raw';
 
 function App() {
-  const [themeName, setThemeName] = useState<'text' | 'rich'>('rich');
+  const [themeName, setThemeName] = useState<'text' | 'rich' | 'imageWood' | 'imageDark' | 'imageGlass'>('imageWood');
   const theme = resolveTheme(themeName);
   
   // Headless UI パターン：フックから状態と操作を取得する
   // KIFコメント内の解析データが自動抽出されます
   const player = useKifuPlayer(SAMPLE_KIF);
+
+  console.log('Current theme senteImages:', theme.piece.senteImages);
 
   // キーボード操作での手数移動
   React.useEffect(() => {
@@ -46,10 +48,11 @@ function App() {
     <ThemeProvider value={theme}>
       <div style={{
         minHeight: '100vh',
-        backgroundColor: '#1a1a2e',
-        color: '#e0e0e0',
+        backgroundColor: themeName === 'imageDark' ? '#0a0a0a' : themeName === 'imageGlass' ? '#1a1a2e' : '#9a9af4ff',
+        color: themeName === 'imageDark' ? '#ffffff' : '#e0e0e0',
         fontFamily: '"Noto Sans JP", system-ui, sans-serif',
         padding: 32,
+        transition: 'background-color 0.3s ease',
       }}>
         {/* ヘッダー */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
@@ -63,42 +66,28 @@ function App() {
           }}>
             react-kifu-player (Headless UI Demo)
           </h1>
-          <p style={{ fontSize: 14, color: '#888' }}>
+          <p style={{ fontSize: 14, color: themeName === 'imageDark' ? '#aaa' : '#888' }}>
             状態（Hook）と見た目（Component）を分離して自由にレイアウトするデモ
           </p>
-        </div>
 
-        {/* コントロール群 (テーマ切替・盤面反転) */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => setThemeName('text')}
-              style={{
-                padding: '8px 20px',
-                border: themeName === 'text' ? '2px solid #e8a87c' : '2px solid #444',
-                borderRadius: 8,
-                background: themeName === 'text' ? 'rgba(232,168,124,0.15)' : 'transparent',
-                color: themeName === 'text' ? '#e8a87c' : '#888',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-              }}
-            >
-              Text Theme
-            </button>
-            <button
-              onClick={() => setThemeName('rich')}
-              style={{
-                padding: '8px 20px',
-                border: themeName === 'rich' ? '2px solid #e8a87c' : '2px solid #444',
-                borderRadius: 8,
-                background: themeName === 'rich' ? 'rgba(232,168,124,0.15)' : 'transparent',
-                color: themeName === 'rich' ? '#e8a87c' : '#888',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-              }}
-            >
-              Rich Theme
-            </button>
+          <div style={{ marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {(['text', 'rich', 'imageWood', 'imageDark', 'imageGlass'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setThemeName(t)}
+                style={{
+                  padding: '8px 20px',
+                  border: themeName === t ? '2px solid #e8a87c' : '2px solid #444',
+                  borderRadius: 8,
+                  background: themeName === t ? 'rgba(232,168,124,0.15)' : 'transparent',
+                  color: themeName === t ? '#e8a87c' : '#888',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+              >
+                {t} Theme
+              </button>
+            ))}
           </div>
         </div>
 
@@ -123,7 +112,6 @@ function App() {
                 lastMove={player.lastMoveCoords || undefined}
                 onForward={player.forward}
                 onBackward={player.backward}
-                showReverseButton={true}
                 playerNameSente={player.header?.blackName ? `☗${player.header.blackName}` : undefined}
                 playerNameGote={player.header?.whiteName ? `☖${player.header.whiteName}` : undefined}
               />
