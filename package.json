@@ -1,0 +1,70 @@
+{
+  "name": "react-kifu-player",
+  "version": "0.1.0",
+  "description": "A rich, customizable React component library for Shogi kifu (game record) playback with evaluation graphs, branching, and theme support.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "shogi",
+    "kifu",
+    "react",
+    "将棋",
+    "棋譜",
+    "game-record",
+    "board-game",
+    "evaluation",
+    "analysis"
+  ],
+  "author": "arakiyuki",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arakiyuki/react-kifu-player.git"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "dependencies": {
+    "tsshogi": "^1.0.0"
+  },
+  "devDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0",
+    "tsup": "^8.0.0",
+    "vitest": "^3.0.0"
+  },
+  "packageManager": "pnpm@10.34.4"
+}
