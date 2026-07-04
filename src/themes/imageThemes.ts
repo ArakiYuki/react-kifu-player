@@ -159,9 +159,9 @@ export const imageGlassTheme: KifuTheme = {
   },
   hand: {
     ...richTheme.hand,
-    background: 'rgba(255,255,255,0.3)',
+    background: '#cceceb', // Soft glass-like cyan to make white pieces visible on any background
     textColor: '#333',
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   piece: {
     ...richTheme.piece,

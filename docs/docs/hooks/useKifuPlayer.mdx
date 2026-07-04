@@ -1,0 +1,157 @@
+---
+sidebar_position: 1
+---
+
+# useKifuPlayer
+
+`useKifuPlayer` は、KIF形式などの棋譜文字列をパースし、盤面状態・評価値・候補手などを一元管理するメインのフックです。`ShogiBoard` や `EvalGraph` 等に渡す全てのデータをこのフックから取得します。
+
+## 基本的な使い方
+
+```tsx
+import { useKifuPlayer, ShogiBoard, ControlBar, EvalGraph, CandidateList } from 'react-kifu-player';
+
+function Player({ kifuString }) {
+  const player = useKifuPlayer(kifuString);
+
+  return (
+    <div>
+      <ShogiBoard 
+        position={player.position}
+        lastMove={player.lastMoveCoords || undefined}
+        onForward={player.forward}
+        onBackward={player.backward}
+      />
+      <ControlBar
+        currentPly={player.currentPly}
+        totalPlies={player.totalPlies}
+        onForward={player.forward}
+        onBackward={player.backward}
+        onGoToStart={player.goToStart}
+        onGoToEnd={player.goToEnd}
+      />
+
+      {/* 解析済み棋譜であれば自動でデータが取れる */}
+      <EvalGraph
+        data={player.evaluations}
+        currentPly={player.currentPly}
+        onPlyClick={(ply) => player.goto(ply)}
+      />
+      <CandidateList
+        candidates={player.candidates}
+        onCandidateClick={(cand) => player.playVariation(cand.readMoves, cand.score)}
+      />
+    </div>
+  );
+}
+```
+
+## 返り値
+
+| プロパティ/メソッド | 型 | 説明 |
+| --- | --- | --- |
+| `position` | `Position` | 現在の盤面・持ち駒の状態 |
+| `currentPly` | `number` | 現在の手数 |
+| `totalPlies` | `number` | 本線の総手数 |
+| `lastMoveCoords` | `{from, to} \| null` | 最終手の座標（盤面ハイライト用） |
+| `evaluations` | `EvaluationPoint[]` | 各手数の評価値リスト（解析済み棋譜から自動抽出） |
+| `candidates` | `Candidate[]` | 現在手数の候補手リスト（解析済み棋譜から自動抽出） |
+| `header` | `GameHeader \| null` | 対局者名・日時などのヘッダー情報 |
+| `moves` | `MoveNode[]` | 棋譜の指し手ノード配列（`MoveList` コンポーネントに渡す） |
+| `isOnBranch` | `boolean` | 現在分岐（変化手順）上にいるかどうか |
+| `error` | `string \| null` | パースエラー情報 |
+| `forward()` | `() => void` | 1手進む |
+| `backward()` | `() => void` | 1手戻る |
+| `goto(ply)` | `(ply: number) => void` | 指定した手数へシーク |
+| `goToStart()` | `() => void` | 初期局面に戻る |
+| `goToEnd()` | `() => void` | 最終局面に進む |
+| `playVariation(moves, score?)` | `(moves: string, score?: number) => void` | 候補手の読み筋を一時的な変化として再生する |
+| `returnToMainLine()` | `() => void` | 分岐再生から本線に戻る |
+
+## 対応する棋譜形式
+
+`useKifuPlayer` は以下の形式を自動認識します。
+
+- **KIF形式** (`.kif`): 最も一般的。変化手順や解析コメント（`** 解析 候補N...`）も自動パース
+- **KI2形式** (`.ki2`)
+- **CSA形式** (`.csa`)
+- **SFEN/USI形式**
+
+### 実際の動作デモ
+
+以下は解析情報付きの `demo.kifu` を読み込み、評価値グラフ・候補手リストと連動するデモです。候補手をクリックすると読み筋が盤面上で再生されます。
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+<BrowserOnly fallback={<div>Loading Demo...</div>}>
+  {() => {
+    const React = require('react');
+    const { useKifuPlayer, ShogiBoard, ControlBar, EvalGraph, CandidateList, ThemeProvider, resolveTheme } = require('react-kifu-player');
+    
+    const Demo = () => {
+      const [kifuStr, setKifuStr] = React.useState('');
+      
+      React.useEffect(() => {
+        fetch('/react-kifu-player/demo.kifu')
+          .then(res => res.text())
+          .then(text => setKifuStr(text));
+      }, []);
+
+      // useKifuPlayer は常に呼び出す（早期 return の前に置く）
+      const player = useKifuPlayer(kifuStr || null);
+      const theme = resolveTheme('imageWood');
+
+      if (!kifuStr) return <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>棋譜を読み込み中...</div>;
+
+      return (
+        <ThemeProvider value={theme}>
+          <div style={{ maxWidth: 500, margin: '2rem auto', background: '#fff', padding: 20, borderRadius: 8, border: '1px solid #eee', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+            <ShogiBoard 
+              position={player.position}
+              lastMove={player.lastMoveCoords || undefined}
+            />
+            <div style={{ marginTop: 16 }}>
+              <ControlBar
+                currentPly={player.currentPly}
+                totalPlies={player.totalPlies}
+                onForward={player.forward}
+                onBackward={player.backward}
+                onGoToStart={player.goToStart}
+                onGoToEnd={player.goToEnd}
+              />
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <EvalGraph
+                data={player.evaluations}
+                currentPly={player.currentPly}
+                onPlyClick={(ply) => player.goto(ply)}
+              />
+            </div>
+            <div style={{ marginTop: 16, padding: 12, background: '#f8fafc', borderRadius: 8 }}>
+              <h4 style={{ fontSize: 14, margin: '0 0 8px 0' }}>
+                💡 {player.currentPly} 手目の候補手
+                {player.isOnBranch && (
+                  <button 
+                    onClick={player.returnToMainLine}
+                    style={{ marginLeft: 12, fontSize: 12, padding: '2px 8px', cursor: 'pointer' }}
+                  >
+                    本譜に戻る
+                  </button>
+                )}
+              </h4>
+              {player.candidates.length > 0 ? (
+                <CandidateList
+                  candidates={player.candidates}
+                  onCandidateClick={(cand) => player.playVariation(cand.readMoves, cand.score)}
+                />
+              ) : (
+                <p style={{ fontSize: 13, color: '#666', margin: 0 }}>（この手数には候補手データがありません。進めてみてください）</p>
+              )}
+            </div>
+          </div>
+        </ThemeProvider>
+      );
+    };
+    return <Demo />;
+  }}
+</BrowserOnly>

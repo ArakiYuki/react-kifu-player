@@ -1,0 +1,120 @@
+---
+sidebar_position: 1
+---
+
+# ShogiBoard
+
+`ShogiBoard` は将棋盤・駒・持ち駒を描画する**ビューコンポーネント**です。状態そのものは持たないため、`useKifuPlayer` や `useShogiProblem` などのフックで管理された `position` を渡して使用します。
+
+## useKifuPlayer との関係
+
+棋譜を再生するケースでは、`useKifuPlayer` で状態を管理し、`ShogiBoard` にその状態を渡します。
+
+```tsx
+import { useKifuPlayer, ShogiBoard } from 'react-kifu-player';
+
+function Player({ kifuString }) {
+  // useKifuPlayer が position・lastMove などを全て管理する
+  const player = useKifuPlayer(kifuString);
+
+  return (
+    <ShogiBoard
+      position={player.position}
+      lastMove={player.lastMoveCoords || undefined}
+      // 盤面クリックで進む/戻る
+      onForward={player.forward}
+      onBackward={player.backward}
+    />
+  );
+}
+```
+
+## useShogiProblem との関係
+
+ユーザーが実際に駒を動かせるインタラクティブモードには、`useShogiProblem` フックとの組み合わせが必要です。`useShogiProblem` が返す `handleSquareClick` や `selectedSquare` などをそのまま渡すだけで合法手判定・ハイライト表示まで自動で動きます。
+
+```tsx
+import { useShogiProblem, ShogiBoard } from 'react-kifu-player';
+
+function InteractiveBoard() {
+  const problem = useShogiProblem({
+    sfen: 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1', // 平手初期局面
+    playerColor: 'black',
+    correctMoves: [], // 空にすると自由に指せる
+  });
+
+  return (
+    <ShogiBoard
+      position={problem.position}
+      lastMove={problem.lastMove}
+      interactive={true}
+      onSquareClick={problem.handleSquareClick}  // クリックハンドラをそのまま渡す
+      selectedSquare={problem.selectedSquare}    // 選択中マスのハイライト
+      highlightSquares={problem.legalMoveSquares} // 合法手の青丸表示
+      showReverseButton={true}
+    />
+  );
+}
+```
+
+## プロパティ (Props)
+
+| Prop名 | 型 | 必須 | 説明 |
+| ------ | -- | ---- | ---- |
+| `position` | `Position` | ✅ | 盤面の状態 |
+| `interactive` | `boolean` | | `true` にすると駒がクリック可能になり（UI上の変化）、`onSquareClick` イベントが発火するようになります。**※注: これをtrueにするだけで自動的に駒が動くようになるわけではありません。** 駒を動かすには、親コンポーネントで `onSquareClick` を受け取り、`position` を更新する独自のロジックやフック（例：`useShogiProblem`）が必要です。 |
+| `onSquareClick` | `(sq: SquareClick) => void` | | `interactive={true}` 時に発火するクリックハンドラ。クリックされたマスの座標や持ち駒情報が渡されます。 |
+| `selectedSquare` | `BoardSquareCoord \| null` | | 選択中のマス（黄色ハイライト）。`useShogiProblem` の `selectedSquare` をそのまま渡せます |
+| `highlightSquares` | `BoardSquareCoord[]` | | 合法手候補のマス（薄い青丸）。`useShogiProblem` の `legalMoveSquares` をそのまま渡せます |
+| `showReverseButton` | `boolean` | | 盤面右上に反転ボタンを表示するかどうか |
+| `onForward` | `() => void` | | 盤面右半分クリック時（`interactive={false}` 時のみ有効） |
+| `onBackward` | `() => void` | | 盤面左半分クリック時（`interactive={false}` 時のみ有効） |
+
+### 実際の動作デモ
+
+以下は、`interactive={true}` と `useShogiProblem`（1手問題用のフック）を組み合わせた動作デモです。
+※ `useShogiProblem` は1手専用のため、**1回動かすと正誤判定が行われ、その後は操作できなくなります**（自由に何手も指せるわけではありません）。
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+<BrowserOnly fallback={<div>Loading Demo...</div>}>
+  {() => {
+    const { useShogiProblem, ShogiBoard, ThemeProvider, resolveTheme } = require('react-kifu-player');
+    
+    const Demo = () => {
+      // SFEN で平手の初期局面を指定
+      const problem = useShogiProblem({
+        sfen: 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1',
+        playerColor: 'black',
+        correctMoves: ['7g7f'], // 7六歩を正解とする
+      });
+      const theme = resolveTheme('imageWood');
+
+      return (
+        <ThemeProvider value={theme}>
+          <div style={{ maxWidth: 400, margin: '2rem auto', background: '#fff', padding: 20, borderRadius: 8, border: '1px solid #eee', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+            <ShogiBoard 
+              position={problem.position}
+              lastMove={problem.lastMove}
+              interactive={true}
+              onSquareClick={problem.handleSquareClick}
+              selectedSquare={problem.selectedSquare}
+              highlightSquares={problem.legalMoveSquares}
+              showReverseButton={true}
+            />
+            <p style={{ textAlign: 'center', marginTop: 12, fontSize: 13, color: '#666' }}>
+              ※ ▲７六歩を指してみてください。<br/>（1手指すと正誤判定が行われ、デモは終了します）
+            </p>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button onClick={problem.reset}>やり直す</button>
+            <div style={{ marginTop: 8, fontWeight: 'bold', color: problem.status === 'correct' ? 'green' : 'red' }}>
+              {problem.status === 'correct' ? '正解！' : problem.status === 'incorrect' ? '不正解' : ''}
+            </div>
+          </div>
+        </ThemeProvider>
+      );
+    };
+    return <Demo />;
+  }}
+</BrowserOnly>

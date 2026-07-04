@@ -1,0 +1,276 @@
+---
+sidebar_position: 2
+---
+
+# useShogiProblem
+
+`useShogiProblem` は、「次の一手問題」UIを構築するためのフックです。課題局面を受け取り、ユーザーが指した手と正解手を比較して正誤判定を行います。
+
+## 主な使い方: extractProblemsFromKifu との組み合わせ
+
+問題データを手動で作成する必要はありません。エンジン解析済みの棋譜（KIF）があれば、[`extractProblemsFromKifu`](../utils/extractProblemsFromKifu) が**自動的に悪手局面を抽出して `useShogiProblem` に渡せる形式で返してくれます**。
+
+```
+解析済みKIF → extractProblemsFromKifu → ShogiProblem[] → useShogiProblem
+```
+
+```tsx
+import React from 'react';
+import {
+  extractProblemsFromKifu,
+  useShogiProblem,
+  ShogiBoard,
+  CandidateList,
+} from 'react-kifu-player';
+
+const kifuString = `...（エンジン解析コメント付きのKIF）...`;
+
+function ProblemApp() {
+  const [index, setIndex] = React.useState(0);
+
+  // 解析済み棋譜から問題を自動生成（後手側の悪手を最大5問抽出）
+  const problems = React.useMemo(() =>
+    extractProblemsFromKifu(kifuString, {
+      playerColor: 'white',
+      evalDropThreshold: 300,
+      correctMoveThreshold: 150,
+      maxProblems: 5,
+    }), []
+  );
+
+  const current = problems[index];
+
+  // useShogiProblem は ShogiProblem をそのまま受け取れる
+  // ※ フックのルールにより、常に呼び出す必要がある
+  const problem = useShogiProblem(current ?? {
+    sfen: 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1',
+    playerColor: 'black',
+    correctMoves: [],
+  });
+
+  if (!current) return <p>問題がありません</p>;
+
+  return (
+    <div>
+      <p>{index + 1}/{problems.length} 問目 （評価値 -{Math.abs(current.evalDrop)} の悪手局面）</p>
+
+      <ShogiBoard
+        position={problem.position}
+        lastMove={problem.lastMove}
+        interactive={problem.status === 'playing'}
+        onSquareClick={problem.handleSquareClick}
+        selectedSquare={problem.selectedSquare}
+        highlightSquares={problem.legalMoveSquares}
+        reversed={current.playerColor === 'white'}  // 後手番なら盤面を反転
+      />
+
+      {problem.status === 'correct' && (
+        <p>🎉 正解！ ({problem.result?.correctMovesText?.[0]})</p>
+      )}
+      {problem.status === 'incorrect' && (
+        <div>
+          <p>❌ 不正解。正解: {problem.result?.correctMovesText?.join(' / ')}</p>
+          {/* 正解手の読み筋を候補手リストで表示することも可能 */}
+          {current.correctMoveCandidates && (
+            <CandidateList
+              candidates={current.correctMoveCandidates}
+              onCandidateClick={(cand) => problem.startPlayback(cand)}
+            />
+          )}
+        </div>
+      )}
+
+      <button onClick={problem.reset}>やり直す</button>
+      <button onClick={() => setIndex((i) => (i + 1) % problems.length)}>
+        次の問題
+      </button>
+    </div>
+  );
+}
+```
+
+## SFENを直接指定する使い方
+
+問題データを自分で用意している場合は、SFEN・手番・正解手を直接指定することもできます。
+
+```tsx
+import { useShogiProblem, ShogiBoard } from 'react-kifu-player';
+
+function ManualProblem() {
+  const problem = useShogiProblem({
+    sfen: 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1',
+    playerColor: 'black',
+    correctMoves: ['7g7f'],  // USI形式で指定
+  });
+
+  return (
+    <ShogiBoard
+      position={problem.position}
+      lastMove={problem.lastMove}
+      interactive={true}
+      onSquareClick={problem.handleSquareClick}
+      selectedSquare={problem.selectedSquare}
+      highlightSquares={problem.legalMoveSquares}
+    />
+  );
+}
+```
+
+> 💡 正解手なし（`correctMoves: []`）にすると、自由に駒を動かせるインタラクティブな盤面として使えます。
+
+## 入力オプション
+
+| パラメータ | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `sfen` | `string` | ✅ | 課題局面のSFEN文字列 |
+| `playerColor` | `'black' \| 'white'` | ✅ | 自分の手番 |
+| `correctMoves` | `string[]` | ✅ | 正解手のリスト（USI形式）。`extractProblemsFromKifu` から取得した値をそのまま渡せます |
+| `correctMoveCandidates` | `Candidate[]` | | 正解手の読み筋（`extractProblemsFromKifu` の返り値から取得できます） |
+| `badMove` | `string` | | 当時の悪手（USI形式）。`extractProblemsFromKifu` の返り値から自動で入ります |
+| `badMoveEval` | `number` | | 悪手時の評価値 |
+| `bestMoveEval` | `number` | | 最善手の評価値 |
+
+## 返り値
+
+| プロパティ/メソッド | 型 | 説明 |
+| --- | --- | --- |
+| `position` | `Position` | 現在の局面（`ShogiBoard` の `position` にそのまま渡せます） |
+| `lastMove` | `{from, to} \| undefined` | 最終手の座標 |
+| `status` | `'playing' \| 'correct' \| 'incorrect'` | 現在の解答状況 |
+| `selectedSquare` | `BoardSquareCoord \| null` | 選択中のマス（`ShogiBoard` の `selectedSquare` にそのまま渡せます） |
+| `legalMoveSquares` | `BoardSquareCoord[]` | 合法手のマスリスト（`ShogiBoard` の `highlightSquares` にそのまま渡せます） |
+| `handleSquareClick` | `(sq: SquareClick) => void` | マスクリックハンドラ（`ShogiBoard` の `onSquareClick` にそのまま渡せます） |
+| `result` | `ProblemResult \| null` | 手を指した後の正誤結果情報 |
+| `reset()` | `() => void` | 問題を最初からやり直す |
+| `startPlayback(candidate)` | `(candidate: Candidate) => void` | 正解手の読み筋を自動再生する |
+| `playbackState` | `{currentPly, totalPlies} \| null` | 再生中の状態 |
+
+### 実際の動作デモ
+
+以下は `extractProblemsFromKifu` で `demo.kifu` から実際の次の一手問題を抽出し、`useShogiProblem` で出題するデモです。駒をクリック→移動先をクリックで解答できます。
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+<BrowserOnly fallback={<div>Loading Demo...</div>}>
+  {() => {
+    const React = require('react');
+    const { useShogiProblem, extractProblemsFromKifu, ShogiBoard, ThemeProvider, resolveTheme } = require('react-kifu-player');
+    
+    const Demo = () => {
+      const [kifuStr, setKifuStr] = React.useState('');
+      const [problemIndex, setProblemIndex] = React.useState(0);
+
+      React.useEffect(() => {
+        fetch('/react-kifu-player/demo.kifu')
+          .then(res => res.text())
+          .then(text => setKifuStr(text));
+      }, []);
+
+      const problems = React.useMemo(() => {
+        if (!kifuStr) return [];
+        try {
+          return extractProblemsFromKifu(kifuStr, {
+            playerColor: 'white',
+            evalDropThreshold: 300,
+            correctMoveThreshold: 150,
+            maxProblems: 5,
+          });
+        } catch {
+          return [];
+        }
+      }, [kifuStr]);
+
+      const currentProblem = problems[problemIndex] || null;
+
+      // useShogiProblem は常に呼び出す（フックのルール）
+      const problem = useShogiProblem(currentProblem ? {
+        sfen: currentProblem.sfen,
+        playerColor: currentProblem.playerColor,
+        correctMoves: currentProblem.correctMoves,
+        correctMoveCandidates: currentProblem.correctMoveCandidates,
+        badMove: currentProblem.badMove,
+        badMoveEval: currentProblem.badMoveEval,
+        bestMoveEval: currentProblem.bestMoveEval,
+      } : {
+        sfen: 'lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1',
+        playerColor: 'black',
+        correctMoves: [],
+      });
+
+      const theme = resolveTheme('imageWood');
+
+      if (!kifuStr) return <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>棋譜を読み込み中...</div>;
+      if (problems.length === 0) return <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>問題が見つかりませんでした</div>;
+
+      const evalDrop = currentProblem ? Math.abs(currentProblem.evalDrop) : 0;
+
+      return (
+        <ThemeProvider value={theme}>
+          <div style={{ maxWidth: 440, margin: '2rem auto', background: '#fff', padding: 20, borderRadius: 8, border: '1px solid #eee', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h4 style={{ margin: 0, fontSize: 14 }}>
+                Q{problemIndex + 1}. 次の一手を当ててください
+              </h4>
+            </div>
+
+            <div style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>
+              {currentProblem?.playerColor === 'black' ? '▲先手番' : '△後手番'} ・ 
+              手数 {currentProblem?.sourcePly}手目の直前局面
+            </div>
+            
+            <ShogiBoard 
+              position={problem.position}
+              lastMove={problem.lastMove}
+              interactive={problem.status === 'playing'}
+              onSquareClick={problem.handleSquareClick}
+              selectedSquare={problem.selectedSquare}
+              highlightSquares={problem.legalMoveSquares}
+              reversed={currentProblem?.playerColor === 'white'}
+            />
+
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              {problem.status === 'playing' && (
+                <p style={{ fontSize: 12, color: '#666', margin: '0 0 12px 0' }}>
+                  ヒント: AIの推奨手を当ててみてください。
+                </p>
+              )}
+              {problem.status === 'correct' && (
+                <div style={{ color: '#059669', fontWeight: 'bold', fontSize: 16, marginBottom: 12 }}>
+                  🎉 正解！ ({problem.result?.correctMovesText?.[0] ?? ''})
+                </div>
+              )}
+              {problem.status === 'incorrect' && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ color: '#dc2626', fontWeight: 'bold', fontSize: 16 }}>
+                    ❌ 不正解 ({problem.result?.userMoveText})
+                  </div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                    正解: {problem.result?.correctMovesText?.join(' / ')}
+                  </div>
+                </div>
+              )}
+              
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button 
+                  onClick={problem.reset}
+                  style={{ padding: '6px 14px', borderRadius: 4, border: '1px solid #ccc', background: '#f8f9fa', cursor: 'pointer', fontSize: 13 }}
+                >
+                  やり直す
+                </button>
+                {problems.length > 1 && (
+                  <button
+                    onClick={() => { setProblemIndex((i) => (i + 1) % problems.length); }}
+                    style={{ padding: '6px 14px', borderRadius: 4, border: '1px solid #3b82f6', background: '#eff6ff', color: '#1d4ed8', cursor: 'pointer', fontSize: 13 }}
+                  >
+                    次の問題 ({problemIndex + 1}/{problems.length})
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </ThemeProvider>
+      );
+    };
+    return <Demo />;
+  }}
+</BrowserOnly>
