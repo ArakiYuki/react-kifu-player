@@ -503,11 +503,7 @@ export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; 
   // インタラクティブモード: 盤面マスクリックのハンドラ
   const handleBoardSquareClick = (x: number, y: number) => {
     if (!interactive || !onSquareClick) return;
-    // isReversed時は座標を兄换
-    const coord: BoardSquareCoord = isReversed
-      ? { x: 10 - x, y: 10 - y }
-      : { x, y };
-    onSquareClick(coord);
+    onSquareClick({ x, y });
   };
 
   // インタラクティブモード: 持ち駒クリックのハンドラ
@@ -518,9 +514,6 @@ export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; 
 
   // selectedSquare を SVG座標に変換
   const getSquareSvgXY = (sq: BoardSquareCoord): { sx: number; sy: number } => {
-    if (isReversed) {
-      return { sx: (sq.x - 1) * CELL_SIZE, sy: (sq.y - 1) * CELL_SIZE };
-    }
     return { sx: (9 - sq.x) * CELL_SIZE, sy: (sq.y - 1) * CELL_SIZE };
   };
 
@@ -639,8 +632,8 @@ export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; 
               {Array.from({ length: BOARD_CELLS }, (_, row) =>
                 Array.from({ length: BOARD_CELLS }, (_, col) => {
                   // SVG座標から将棋座標に変換
-                  const fileX = isReversed ? col + 1 : 9 - col;
-                  const rankY = isReversed ? 9 - row : row + 1;
+                  const fileX = 9 - col;
+                  const rankY = row + 1;
                   return (
                     <rect
                       key={`grid-${row}-${col}`}
