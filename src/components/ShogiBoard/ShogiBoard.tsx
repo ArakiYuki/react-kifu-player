@@ -446,7 +446,21 @@ function HandDisplay({
     });
   }
 
-  return <g>{pieces}</g>;
+  return (
+    <g>
+      {handTheme.background !== 'transparent' && (
+        <rect
+          x={x}
+          y={y}
+          width={HAND_WIDTH}
+          height={height}
+          fill={handTheme.background}
+          rx={4}
+        />
+      )}
+      {pieces}
+    </g>
+  );
 }
 
 // ---------------------------------------------------------------------------
