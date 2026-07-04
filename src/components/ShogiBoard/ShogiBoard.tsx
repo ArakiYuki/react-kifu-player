@@ -591,14 +591,7 @@ export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; 
           {/* ハイライト (最終手) */}
           {lastMove && (
             <>
-              {lastMove.from && (
-                <HighlightSquare
-                  x={(9 - lastMove.from.x) * CELL_SIZE}
-                  y={(lastMove.from.y - 1) * CELL_SIZE}
-                  color={boardTheme.highlightColor}
-                  cellSize={CELL_SIZE}
-                />
-              )}
+              {/* lastMove.fromのハイライトは違和感があるため削除しました */}
               <HighlightSquare
                 x={(9 - lastMove.to.x) * CELL_SIZE}
                 y={(lastMove.to.y - 1) * CELL_SIZE}
