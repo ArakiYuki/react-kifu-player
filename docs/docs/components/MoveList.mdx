@@ -1,0 +1,112 @@
+---
+sidebar_position: 5
+---
+
+# MoveList
+
+棋譜の指し手一覧を表示するコンポーネントです。
+現在の手数（ハイライト表示）のトラッキングや、リストの項目をクリックした際の指定手数へのジャンプ、および分岐（変化手順）の表示に対応しています。
+
+`useKifuPlayer` フックから得られる `record` と `currentPly`、および `goToPly` 関数を渡すだけで、自動で同期する指し手リストが完成します。
+
+## インポート
+
+```tsx
+import { MoveList } from 'react-kifu-player';
+```
+
+## 基本的な使い方
+
+```tsx
+import React from 'react';
+import { useKifuPlayer, ShogiBoard, MoveList } from 'react-kifu-player';
+
+const sampleKifu = `手合割：平手\n手数----指手---------消費時間--\n   1 ２六歩(27)\n   2 ８四歩(83)\n   3 ２五歩(26)\n   4 ８五歩(84)`;
+
+export default function App() {
+  const player = useKifuPlayer(sampleKifu);
+
+  return (
+    <div style={{ display: 'flex', gap: 20 }}>
+      {/* 盤面領域 */}
+      <div style={{ flex: '1', maxWidth: 400 }}>
+        <ShogiBoard 
+          position={player.position} 
+          onForward={player.forward}
+          onBackward={player.backward}
+        />
+      </div>
+
+      {/* 指し手リスト領域 */}
+      <div style={{ width: 250, height: 400 }}>
+        <MoveList
+          moves={player.record.moves}
+          currentPly={player.currentPly}
+          onPlyClick={player.goto}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+## プロパティ (Props)
+
+| Prop名 | 型 | 必須 | 説明 |
+| ------ | -- | ---- | ---- |
+| `moves` | `MoveNode[]` | ✅ | `parseKifu`（または `useKifuPlayer`）によってパースされた棋譜データの `moves` 配列 |
+| `currentPly` | `number` | ✅ | 現在の手数。この手数がリスト上でハイライト表示され、リストが自動スクロールします |
+| `onPlyClick` | `(ply: number) => void` | | リスト内の任意の指し手がクリックされた時に呼ばれるハンドラ。通常は `player.goto` を渡します |
+| `theme` | `MoveListTheme` | | テーマを個別に上書きする場合に指定します（通常は `ThemeProvider` を推奨） |
+| `className` | `string` | | ルート要素に適用するカスタムクラス名 |
+
+## 分岐の表示
+
+KIFファイル等に分岐（変化手順）が含まれている場合、`MoveList` は分岐ポイントに専用のマーカー（分岐インジケーター）を表示します。ユーザーがその分岐をクリックすると、対象の分岐ツリーに入ることができます。
+
+## 自動スクロール
+
+`currentPly` が変更されると、`MoveList` はその手数が常に表示領域内に収まるように自動的にスクロールを行います。盤面を操作している際にもリストが連動して動くため、ユーザーが現在の局面を見失うことはありません。
+
+## 実際の動作デモ
+
+以下は `MoveList` の動作デモです。リストの行をクリックするとハイライトが移動し、連動して動作していることが確認できます。
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+<BrowserOnly fallback={<div>Loading Demo...</div>}>
+  {() => {
+    const { MoveList, ShogiBoard, ThemeProvider, resolveTheme, useKifuPlayer } = require('react-kifu-player');
+    
+    // KIF形式のサンプル
+    const sampleKifu = `手合割：平手\n手数----指手---------消費時間--\n   1 ２六歩(27)\n   2 ８四歩(83)\n   3 ２五歩(26)\n   4 ８五歩(84)\n   5 ７八金(69)\n   6 ３二金(41)\n   7 ２四歩(25)\n   8 同　歩(23)\n   9 同　飛(28)\n  10 ８六歩(85)`;
+    
+    const Demo = () => {
+      const player = useKifuPlayer(sampleKifu);
+      const theme = resolveTheme('text'); // デフォルトテーマ
+
+      return (
+        <ThemeProvider value={theme}>
+          <div style={{ display: 'flex', gap: '20px', maxWidth: 600, margin: '2rem auto', alignItems: 'flex-start' }}>
+            <div style={{ flex: '1' }}>
+              <ShogiBoard
+                position={player.position}
+                lastMove={player.lastMoveCoords || undefined}
+                onForward={player.forward}
+                onBackward={player.backward}
+              />
+            </div>
+            <div style={{ width: 220, border: '1px solid #ccc', borderRadius: 8, overflow: 'hidden' }}>
+              <MoveList
+                moves={player.record.moves}
+                currentPly={player.currentPly}
+                onPlyClick={player.goto}
+              />
+            </div>
+          </div>
+        </ThemeProvider>
+      );
+    };
+    return <Demo />;
+  }}
+</BrowserOnly>

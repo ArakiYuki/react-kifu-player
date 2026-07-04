@@ -1,0 +1,140 @@
+---
+sidebar_position: 3
+---
+
+# CandidateList
+
+`CandidateList` は、AIエンジンが出力した候補手（読み筋）のリストを表示するコンポーネントです。
+
+## データの取得方法
+
+**候補手データは `useKifuPlayer` から自動的に取得できます。** 解析済み棋譜（`** 解析 候補N` コメントが含まれるKIFなど）を読み込むと、`candidates` として現在の手数の候補手が自動的に取り出されます。
+
+```tsx
+import { useKifuPlayer, CandidateList } from 'react-kifu-player';
+
+function PlayerWithCandidates({ kifuString }) {
+  const player = useKifuPlayer(kifuString);
+
+  return (
+    <CandidateList
+      // player.candidates に現在手数の候補手リストが入っている
+      candidates={player.candidates}
+      onCandidateClick={(candidate) => {
+        // クリックされた候補手の読み筋を盤面上で再生
+        player.playVariation(candidate.readMoves, candidate.score);
+      }}
+    />
+  );
+}
+```
+
+## プロパティ (Props)
+
+| Prop名 | 型 | 必須 | 説明 |
+| ------ | -- | ---- | ---- |
+| `candidates` | `Candidate[]` | ✅ | 候補手の配列。`useKifuPlayer` の `candidates` をそのまま渡せます |
+| `onCandidateClick` | `(candidate: Candidate) => void` | | 候補手がクリックされた際のコールバック |
+
+## Candidate 型
+
+```ts
+type Candidate = {
+  /** 候補手ID (1, 2, 3...) */
+  id: number;
+  /** 評価値 */
+  score: number;
+  /** 探索深さ */
+  depth?: number;
+  /** 読み筋 (USIまたはKIF形式) */
+  readMoves: string;
+  /** 表示用に整形された読み筋 */
+  formattedMoves?: string;
+};
+```
+
+## 候補手クリック時の読み筋再生
+
+`useKifuPlayer` の `playVariation` と組み合わせることで、クリックした候補手の読み筋を盤面上で再生できます。`returnToMainLine` で本譜に戻ることができます。
+
+```tsx
+const player = useKifuPlayer(kifuString);
+
+<CandidateList
+  candidates={player.candidates}
+  onCandidateClick={(cand) => player.playVariation(cand.readMoves, cand.score)}
+/>
+<button onClick={player.returnToMainLine}>本譜に戻る</button>
+```
+
+### 実際の動作デモ
+
+以下は `demo.kifu`（解析情報入り）を読み込み、現在手数の候補手を表示するデモです。棋譜を進めると各手の候補手が切り替わります。候補手をクリックするとその読み筋が再生されます。
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+<BrowserOnly fallback={<div>Loading Demo...</div>}>
+  {() => {
+    const React = require('react');
+    const { useKifuPlayer, ShogiBoard, ControlBar, CandidateList, ThemeProvider, resolveTheme } = require('react-kifu-player');
+    
+    const Demo = () => {
+      const [kifuStr, setKifuStr] = React.useState('');
+      
+      React.useEffect(() => {
+        fetch('/react-kifu-player/demo.kifu')
+          .then(res => res.text())
+          .then(text => setKifuStr(text));
+      }, []);
+
+      // useKifuPlayer は常に呼び出す（早期 return の前に置く）
+      const player = useKifuPlayer(kifuStr || null);
+      const theme = resolveTheme('imageWood');
+
+      if (!kifuStr) return <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>棋譜を読み込み中...</div>;
+
+      return (
+        <ThemeProvider value={theme}>
+          <div style={{ maxWidth: 500, margin: '2rem auto', background: '#fff', padding: 20, borderRadius: 8, border: '1px solid #eee', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+            <ShogiBoard 
+              position={player.position}
+              lastMove={player.lastMoveCoords || undefined}
+            />
+            <div style={{ marginTop: 16 }}>
+              <ControlBar
+                currentPly={player.currentPly}
+                totalPlies={player.totalPlies}
+                onForward={player.forward}
+                onBackward={player.backward}
+                onGoToStart={player.goToStart}
+                onGoToEnd={player.goToEnd}
+              />
+            </div>
+            <div style={{ marginTop: 24, padding: 12, background: '#f8fafc', borderRadius: 8 }}>
+              <h4 style={{ fontSize: 14, margin: '0 0 8px 0' }}>
+                💡 {player.currentPly} 手目の候補手
+                {player.isOnBranch && (
+                  <button 
+                    onClick={player.returnToMainLine}
+                    style={{ marginLeft: 12, fontSize: 12, padding: '2px 8px', cursor: 'pointer' }}
+                  >
+                    本譜に戻る
+                  </button>
+                )}
+              </h4>
+              {player.candidates.length > 0 ? (
+                <CandidateList
+                  candidates={player.candidates}
+                  onCandidateClick={(cand) => player.playVariation(cand.readMoves, cand.score)}
+                />
+              ) : (
+                <p style={{ fontSize: 13, color: '#666', margin: 0 }}>（この手数には候補手データがありません）</p>
+              )}
+            </div>
+          </div>
+        </ThemeProvider>
+      );
+    };
+    return <Demo />;
+  }}
+</BrowserOnly>

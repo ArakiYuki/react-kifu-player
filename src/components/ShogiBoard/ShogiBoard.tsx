@@ -141,14 +141,17 @@ function PieceCell({
   y,
   theme,
   cellSize,
+  upsideDown,
 }: {
   piece: BoardPiece;
   x: number;
   y: number;
   theme: PieceTheme;
   cellSize: number;
+  upsideDown?: boolean;
 }) {
   const isGote = piece.color === 'white';
+  const shouldRotate = upsideDown !== undefined ? upsideDown : isGote;
   const displayChar = PIECE_DISPLAY[piece.kind] || '?';
   const isPromoted = ['TO', 'NY', 'NK', 'NG', 'UM', 'RY'].includes(piece.kind);
 
@@ -200,7 +203,7 @@ function PieceCell({
           fontFamily={theme.fontFamily}
           fontWeight="bold"
           fill={isPromoted ? '#cc0000' : color}
-          transform={isGote ? `rotate(180, ${cellSize / 2}, ${cellSize / 2})` : undefined}
+          transform={shouldRotate ? `rotate(180, ${cellSize / 2}, ${cellSize / 2})` : undefined}
         >
           {displayChar}
         </text>
@@ -221,7 +224,7 @@ function PieceCell({
             y={2}
             width={cellSize - 4}
             height={cellSize - 4}
-            transform={isGote ? `rotate(180, ${cellSize / 2}, ${cellSize / 2})` : undefined}
+            transform={shouldRotate ? `rotate(180, ${cellSize / 2}, ${cellSize / 2})` : undefined}
           />
         </g>
       );
@@ -427,6 +430,7 @@ function HandDisplay({
             cellSize={pieceSize}
             x={pieceX}
             y={pieceY}
+            upsideDown={!isBottom}
           />
           <text
             x={pieceX + pieceSize + 4}
@@ -454,7 +458,7 @@ function HandDisplay({
           y={y}
           width={HAND_WIDTH}
           height={height}
-          fill={handTheme.background}
+          fill={handTheme.background.startsWith('linear') ? '#c4a265' : handTheme.background}
           rx={4}
         />
       )}

@@ -1,0 +1,114 @@
+---
+sidebar_position: 2
+---
+
+# Getting Started
+
+`react-kifu-player` のインストール方法と、最短で盤面を表示するためのクイックスタートガイドです。
+
+## インストール
+
+npm、yarn、pnpmなどのパッケージマネージャーを使用してインストールします。
+
+```bash
+npm install react-kifu-player
+# or
+yarn add react-kifu-player
+# or
+pnpm add react-kifu-player
+```
+
+## クイックスタート
+
+インストールが完了したら、さっそく React コンポーネントに将棋盤を表示してみましょう。
+最もシンプルな使い方は、`useKifuPlayer` フックで状態を管理し、`ShogiBoard` や `ControlBar` コンポーネントに渡す方法です。
+
+```tsx
+import React from 'react';
+import { useKifuPlayer, ShogiBoard, ControlBar } from 'react-kifu-player';
+
+// 一般的なKIF文字列（初期局面から数手）
+const sampleKifu = `
+手合割：平手
+手数----指手---------消費時間--
+   1 ２六歩(27)   ( 0:00/00:00:00)
+   2 ８四歩(83)   ( 0:00/00:00:00)
+   3 ２五歩(26)   ( 0:00/00:00:00)
+   4 ８五歩(84)   ( 0:00/00:00:00)
+   5 ７八金(69)   ( 0:00/00:00:00)
+   6 ３二金(41)   ( 0:00/00:00:00)
+`;
+
+export default function SimplePlayer() {
+  // 1. KIF文字列を渡してプレイヤー状態を初期化
+  const player = useKifuPlayer(sampleKifu);
+
+  return (
+    <div style={{ maxWidth: 400, margin: '0 auto' }}>
+      {/* 2. 盤面の描画 */}
+      <ShogiBoard 
+        position={player.position} 
+        lastMove={player.lastMoveCoords || undefined}
+        onForward={player.forward}
+        onBackward={player.backward}
+      />
+      
+      {/* 3. コントロールバー（再生・戻る・進むボタン等） */}
+      <div style={{ marginTop: 16 }}>
+        <ControlBar
+          currentPly={player.currentPly}
+          totalPlies={player.totalPlies}
+          onForward={player.forward}
+          onBackward={player.backward}
+          onGoToStart={player.goToStart}
+          onGoToEnd={player.goToEnd}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+このコードを実行すると、美しい将棋盤と操作ボタンが表示され、ボタンをクリックして棋譜を進めたり戻したりすることができます。
+
+### 実際の動作デモ
+
+以下は、このドキュメント内に直接埋め込まれた実際の `react-kifu-player` のコンポーネントです。進む・戻るボタンを実際にクリックして動作を確認できます。
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+<BrowserOnly fallback={<div>Loading Demo...</div>}>
+  {() => {
+    const { useKifuPlayer, ShogiBoard, ControlBar, ThemeProvider, resolveTheme } = require('react-kifu-player');
+    const sampleKifu = `手合割：平手\n手数----指手---------消費時間--\n   1 ２六歩(27)   ( 0:00/00:00:00)\n   2 ８四歩(83)   ( 0:00/00:00:00)\n   3 ２五歩(26)   ( 0:00/00:00:00)\n   4 ８五歩(84)   ( 0:00/00:00:00)\n   5 ７八金(69)   ( 0:00/00:00:00)\n   6 ３二金(41)   ( 0:00/00:00:00)`;
+    
+    // MDX内でフックを使うためのラッパーコンポーネント
+    const Demo = () => {
+      const player = useKifuPlayer(sampleKifu);
+      const theme = resolveTheme('imageWood');
+      return (
+        <ThemeProvider value={theme}>
+          <div style={{ maxWidth: 400, margin: '2rem auto', background: '#fff', padding: 20, borderRadius: 8, border: '1px solid #eee' }}>
+            <ShogiBoard 
+              position={player.position} 
+              lastMove={player.lastMoveCoords || undefined}
+              onForward={player.forward}
+              onBackward={player.backward}
+            />
+            <div style={{ marginTop: 16 }}>
+              <ControlBar
+                currentPly={player.currentPly}
+                totalPlies={player.totalPlies}
+                onForward={player.forward}
+                onBackward={player.backward}
+                onGoToStart={player.goToStart}
+                onGoToEnd={player.goToEnd}
+              />
+            </div>
+          </div>
+        </ThemeProvider>
+      );
+    };
+    return <Demo />;
+  }}
+</BrowserOnly>

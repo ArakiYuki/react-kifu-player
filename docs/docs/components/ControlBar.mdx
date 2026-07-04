@@ -1,0 +1,105 @@
+---
+sidebar_position: 4
+---
+
+# ControlBar
+
+棋譜の再生や移動を行うためのコントローラー（操作ボタン群）を表示するコンポーネントです。
+「最初へ」「1手戻る」「1手進む」「最後へ」の4つのボタンと、現在の手数表示を含みます。
+
+`useKifuPlayer` フックの返り値であるメソッドをそのまま渡すだけで機能します。
+
+## インポート
+
+```tsx
+import { ControlBar } from 'react-kifu-player';
+```
+
+## 基本的な使い方
+
+```tsx
+import React from 'react';
+import { useKifuPlayer, ShogiBoard, ControlBar } from 'react-kifu-player';
+
+const sampleKifu = `手合割：平手\n手数----指手---------消費時間--\n   1 ２六歩(27)\n   2 ８四歩(83)\n   3 ２五歩(26)\n   4 ８五歩(84)`;
+
+export default function App() {
+  const player = useKifuPlayer(sampleKifu);
+
+  return (
+    <div style={{ maxWidth: 400 }}>
+      <ShogiBoard 
+        position={player.position} 
+        onForward={player.forward}
+        onBackward={player.backward}
+      />
+      {/* 盤面の下にコントロールバーを配置 */}
+      <ControlBar
+        currentPly={player.currentPly}
+        totalPlies={player.totalPlies}
+        onForward={player.forward}
+        onBackward={player.backward}
+        onGoToStart={player.goToStart}
+        onGoToEnd={player.goToEnd}
+      />
+    </div>
+  );
+}
+```
+
+## プロパティ (Props)
+
+| Prop名 | 型 | 必須 | 説明 |
+| ------ | -- | ---- | ---- |
+| `currentPly` | `number` | ✅ | 現在の手数。`0` は初期局面を表します |
+| `totalPlies` | `number` | ✅ | 総手数 |
+| `onBackward` | `() => void` | ✅ | 1手戻るボタンがクリックされた時のハンドラ |
+| `onForward` | `() => void` | ✅ | 1手進むボタンがクリックされた時のハンドラ |
+| `onGoToStart` | `() => void` | ✅ | 最初へ戻るボタンがクリックされた時のハンドラ |
+| `onGoToEnd` | `() => void` | ✅ | 最後へ進むボタンがクリックされた時のハンドラ |
+| `theme` | `ControlBarTheme` | | テーマを個別に上書きする場合に指定します（通常は `ThemeProvider` による全体指定を推奨） |
+| `className` | `string` | | ルート要素に適用するカスタムクラス名 |
+
+## スタイリング
+
+ボタンの色やサイズ、背景色はテーマ（`ControlBarTheme`）によって定義されます。
+デフォルトでは背景が透過（`transparent`）になっており、どのようなレイアウトにもなじみやすいように設計されています。ボタンをホバーした際の色や、アクティブ（クリック）時の色もテーマ側でカスタマイズ可能です。
+
+## 実際の動作デモ
+
+以下は `ControlBar` の動作デモです。ボタンを押して手数が変わることを確認できます。（※このデモでは盤面は省略しています）
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+<BrowserOnly fallback={<div>Loading Demo...</div>}>
+  {() => {
+    const { ControlBar, ThemeProvider, resolveTheme } = require('react-kifu-player');
+    const { useState } = require('react');
+    
+    const Demo = () => {
+      const [ply, setPly] = useState(0);
+      const total = 10;
+      const theme = resolveTheme('rich');
+
+      return (
+        <ThemeProvider value={theme}>
+          <div style={{ maxWidth: 400, margin: '2rem auto', background: '#fff', padding: 20, borderRadius: 8, border: '1px solid #eee' }}>
+            <h4 style={{ textAlign: 'center', marginBottom: 16 }}>ControlBar デモ</h4>
+            <ControlBar
+              currentPly={ply}
+              totalPlies={total}
+              onBackward={() => setPly(p => Math.max(0, p - 1))}
+              onForward={() => setPly(p => Math.min(total, p + 1))}
+              onGoToStart={() => setPly(0)}
+              onGoToEnd={() => setPly(total)}
+            />
+            <p style={{ textAlign: 'center', marginTop: 16, color: '#666' }}>
+              現在の状態: {ply} / {total} 手目
+            </p>
+          </div>
+        </ThemeProvider>
+      );
+    };
+    return <Demo />;
+  }}
+</BrowserOnly>

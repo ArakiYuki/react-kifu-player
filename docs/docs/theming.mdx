@@ -1,0 +1,189 @@
+---
+sidebar_position: 5
+---
+
+# テーマとカスタマイズ (Theming)
+
+`react-kifu-player` の大きな特徴の一つは、コンポーネントの見た目を完全にカスタマイズできるテーマ機能です。
+CSS を上書きする面倒な作業は不要で、JavaScript（TypeScript）のオブジェクトを渡すだけで盤面や駒のデザインを切り替えることができます。
+
+## 組み込みテーマ
+
+ライブラリには最初から以下の高品質なテーマが組み込まれています。
+
+- **`imageWood`** (木目調): リアルな木目の盤面と標準的な駒
+- **`imageGlass`** (ガラス調): 透明感があるモダンなテーマ
+- **`imageDark`** (ダークモード): 暗い背景に最適化されたテーマ
+- **`rich`** (リッチイラスト): 丸みのあるかわいらしいイラスト調のテーマ
+- **`text`** (テキスト表示): 画像を使わず文字だけで駒を表現する軽量なテーマ
+
+
+## テーマの適用方法
+
+テーマを適用するには、`ThemeProvider` を使用してコンポーネントツリー全体にテーマ設定を注入します。
+
+```tsx
+import { ThemeProvider, resolveTheme } from 'react-kifu-player';
+
+// 'imageGlass' テーマを取得
+const glassTheme = resolveTheme('imageGlass');
+
+function App() {
+  return (
+    // 💡 プロバイダーで囲むだけで、内部の全ての将棋コンポーネントにテーマが適用されます
+    <ThemeProvider value={glassTheme}>
+      <ShogiBoard position={player.position} />
+      <ControlBar />
+    </ThemeProvider>
+  );
+}
+```
+
+## ガラステーマ (`imageGlass`) の利用時の注意点
+
+ガラステーマは「背景が透けて見える（透過する）」仕様になっています。
+そのため、アプリ側の外枠（`<ShogiBoard>` を囲む `div` など）の背景色が白 (`#ffffff`) だと、白っぽいガラス駒が見えづらくなることがあります。
+
+ガラステーマを使用する場合は、アプリ側の背景に**水色や画像、あるいは少し濃いめの色**を設定することをお勧めします。
+
+```tsx
+<div style={{ background: '#8bc0d0', padding: 20 }}>
+  <ShogiBoard position={player.position} />
+</div>
+```
+
+## カスタムテーマの作成
+
+`resolveTheme` は文字列（組み込みテーマ名）だけでなく、**部分的な設定オブジェクト（`PartialKifuTheme`）**も受け付けます。指定したキーだけが上書きされ、残りはデフォルト値（`text` テーマ）が使われます。
+
+```tsx
+import { resolveTheme, ThemeProvider } from 'react-kifu-player';
+
+// 木目テーマをベースに、盤面の色だけ変えたい場合
+const myTheme = resolveTheme({
+  name: 'my-theme',
+  board: {
+    background: '#f0e68c',       // 盤面の背景色
+    gridColor: '#8B4513',        // 罫線の色
+    highlightColor: 'rgba(255, 80, 80, 0.5)', // 最終手ハイライト色
+    labelColor: '#4a2600',       // 座標ラベル色
+  },
+});
+```
+
+## 自前の駒画像を使う
+
+駒画像はコンポーネントライブラリに内包されているため、**自前の画像を使いたい場合は `piece.senteImages` に駒種ごとのURL/SVGデータURIを指定**します。
+
+```tsx
+import { resolveTheme, ThemeProvider } from 'react-kifu-player';
+
+// 駒種（PieceKind）一覧:
+// 'FU'(歩) 'KY'(香) 'KE'(桂) 'GI'(銀) 'KI'(金) 'KA'(角) 'HI'(飛) 'OU'(玉)
+// 'TO'(と) 'NY'(成香) 'NK'(成桂) 'NG'(成銀) 'UM'(馬) 'RY'(龍)
+
+const myImageTheme = resolveTheme({
+  name: 'my-image-theme',
+  piece: {
+    mode: 'image', // 画像モードを明示的に指定
+    senteImages: {
+      FU: '/images/sente/fu.svg',   // 先手の歩
+      KI: '/images/sente/ki.svg',   // 先手の金
+      // ... 他の駒種も同様に指定
+    },
+    // goteImages を省略すると、senteImages を 180度回転して後手駒に使用します
+    goteImages: {
+      FU: '/images/gote/fu.svg',    // 後手の歩（省略した場合は先手を180度回転）
+    },
+  },
+});
+
+function App() {
+  return (
+    <ThemeProvider value={myImageTheme}>
+      <ShogiBoard position={position} />
+    </ThemeProvider>
+  );
+}
+```
+
+## 完全カスタムレンダラー（上級者向け）
+
+駒の描画を完全に自前で行いたい場合は、`piece.customRenderer` に関数を指定します。
+
+```tsx
+import type { BoardPiece } from 'react-kifu-player';
+
+const myCustomTheme = resolveTheme({
+  name: 'custom-renderer-theme',
+  piece: {
+    mode: 'custom',
+    customRenderer: (piece: BoardPiece, size: number) => {
+      // 駒種と手番に応じて任意のReact要素を返す
+      const isBlack = piece.color === 'black';
+      return (
+        <div style={{
+          width: size,
+          height: size,
+          background: isBlack ? '#1a1a2e' : '#f0f0f0',
+          color: isBlack ? '#e94560' : '#0f3460',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: size * 0.4,
+          borderRadius: 4,
+          border: '2px solid currentColor',
+        }}>
+          {piece.kind}
+        </div>
+      );
+    },
+  },
+});
+```
+
+
+### 実際の動作デモ
+
+以下は、組み込みテーマを動的に切り替えるデモです。ボタンを押して、全く同じ `<ShogiBoard>` コンポーネントの見た目がどのように変化するか確認してください。
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+<BrowserOnly fallback={<div>Loading Demo...</div>}>
+  {() => {
+    const React = require('react');
+    const { useKifuPlayer, ShogiBoard, ThemeProvider, resolveTheme } = require('react-kifu-player');
+    
+    const Demo = () => {
+      const player = useKifuPlayer('手合割：平手\n手数----指手---------消費時間--');
+      const [themeName, setThemeName] = React.useState('imageWood');
+      
+      const theme = resolveTheme(themeName);
+
+      // ガラステーマの時は背景を水色にするなど、外枠のスタイルを調整
+      const containerStyle = {
+        maxWidth: 400, margin: '2rem auto', padding: 20, borderRadius: 8, 
+        border: '1px solid #eee', boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+        background: themeName === 'imageGlass' ? '#8bc0d0' : '#fff',
+        transition: 'background 0.3s ease'
+      };
+
+      return (
+        <div>
+          <div style={{ textAlign: 'center', marginBottom: 16 }}>
+            <button onClick={() => setThemeName('imageWood')} style={{ padding: '8px 12px', marginRight: 8, cursor: 'pointer', fontWeight: themeName === 'imageWood' ? 'bold' : 'normal' }}>木目調 (imageWood)</button>
+            <button onClick={() => setThemeName('imageGlass')} style={{ padding: '8px 12px', marginRight: 8, cursor: 'pointer', fontWeight: themeName === 'imageGlass' ? 'bold' : 'normal' }}>ガラス (imageGlass)</button>
+            <button onClick={() => setThemeName('imageDark')} style={{ padding: '8px 12px', marginRight: 8, cursor: 'pointer', fontWeight: themeName === 'imageDark' ? 'bold' : 'normal' }}>ダーク (imageDark)</button>
+          </div>
+          
+          <ThemeProvider value={theme}>
+            <div style={containerStyle}>
+              <ShogiBoard position={player.position} />
+            </div>
+          </ThemeProvider>
+        </div>
+      );
+    };
+    return <Demo />;
+  }}
+</BrowserOnly>

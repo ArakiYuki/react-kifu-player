@@ -1,0 +1,117 @@
+---
+sidebar_position: 2
+---
+
+# EvalGraph
+
+`EvalGraph` は、将棋の評価値（エンジンによる形勢判断）の推移をグラフとして表示するコンポーネントです。
+
+## データの取得方法
+
+**評価値データは `useKifuPlayer` から自動的に取得できます。** 解析済み棋譜（`** 解析` コメントが含まれるKIFなど）を `useKifuPlayer` に渡すと、`evaluations` プロパティとして自動パースされます。
+
+```tsx
+import { useKifuPlayer, EvalGraph } from 'react-kifu-player';
+
+function PlayerWithGraph({ kifuString }) {
+  const player = useKifuPlayer(kifuString);
+
+  return (
+    <div>
+      {/* EvalGraph には player.evaluations をそのまま渡せる */}
+      <EvalGraph
+        data={player.evaluations}
+        currentPly={player.currentPly}
+        onPlyClick={(ply) => player.goto(ply)}
+      />
+    </div>
+  );
+}
+```
+
+## プロパティ (Props)
+
+| Prop名 | 型 | 必須 | 説明 |
+| ------ | -- | ---- | ---- |
+| `data` | `EvaluationPoint[]` | ✅ | 評価値データの配列 |
+| `currentPly` | `number` | ✅ | 現在の手数。グラフ上でその手数に縦線が引かれます |
+| `onPlyClick` | `(ply: number) => void` | | グラフをクリックした際のコールバック。通常はその手数へのシークに使います |
+| `branchData` | `EvaluationPoint[]` | | 分岐再生中の評価値データ（`useKifuPlayer` の `variationEval` 等で活用） |
+| `maxScore` | `number` | | グラフの評価値の上限（デフォルト: 2000） |
+
+## EvaluationPoint 型
+
+```ts
+type EvaluationPoint = {
+  /** 手数 */
+  ply: number;
+  /** 評価値 (先手視点、centipawn) */
+  score: number;
+  /** 詰みの場合の手数 (正=先手勝ち、負=後手勝ち、null=詰みなし) */
+  mate: number | null;
+};
+```
+
+## 詰みの表現
+
+`mate` フィールドが `null` でない場合は詰み扱いとなり、グラフ上では振り切れた値として表現されます。
+
+### 実際の動作デモ
+
+以下は `EvalGraph` の実際の動作デモです。`demo.kifu`（解析情報入り）を読み込み、`useKifuPlayer` から `evaluations` を取得してグラフに表示しています。グラフをクリックするとその手数に移動します。
+
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+<BrowserOnly fallback={<div>Loading Demo...</div>}>
+  {() => {
+    const React = require('react');
+    const { useKifuPlayer, EvalGraph, ShogiBoard, ControlBar, ThemeProvider, resolveTheme } = require('react-kifu-player');
+    
+    const Demo = () => {
+      const [kifuStr, setKifuStr] = React.useState('');
+      
+      React.useEffect(() => {
+        fetch('/react-kifu-player/demo.kifu')
+          .then(res => res.text())
+          .then(text => setKifuStr(text));
+      }, []);
+
+      // useKifuPlayer は常に呼び出す（空文字列やnullでも動作する）
+      const player = useKifuPlayer(kifuStr || null);
+      const theme = resolveTheme('imageWood');
+
+      // データ取得前はシンプルなローディング表示
+      if (!kifuStr) return <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>棋譜を読み込み中...</div>;
+
+      return (
+        <ThemeProvider value={theme}>
+          <div style={{ maxWidth: 500, margin: '2rem auto', background: '#fff', padding: 20, borderRadius: 8, border: '1px solid #eee', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+            <ShogiBoard 
+              position={player.position}
+              lastMove={player.lastMoveCoords || undefined}
+            />
+            <div style={{ marginTop: 16 }}>
+              <ControlBar
+                currentPly={player.currentPly}
+                totalPlies={player.totalPlies}
+                onForward={player.forward}
+                onBackward={player.backward}
+                onGoToStart={player.goToStart}
+                onGoToEnd={player.goToEnd}
+              />
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <h4 style={{ fontSize: 14, margin: '0 0 8px 0' }}>評価値グラフ（クリックで手数移動）</h4>
+              <EvalGraph
+                data={player.evaluations}
+                currentPly={player.currentPly}
+                onPlyClick={(ply) => player.goto(ply)}
+              />
+            </div>
+          </div>
+        </ThemeProvider>
+      );
+    };
+    return <Demo />;
+  }}
+</BrowserOnly>
