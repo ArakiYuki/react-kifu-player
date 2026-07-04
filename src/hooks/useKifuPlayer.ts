@@ -57,7 +57,7 @@ export type UseKifuPlayerReturn = {
   /** 最終局面へ */
   goToEnd: () => void;
   /** 候補手などの指し手文字列をパースして一時的な分岐として再生する */
-  playVariation: (movesStr: string) => void;
+  playVariation: (movesStr: string, candidateScore?: number) => void;
   /** 一時的な分岐再生から本譜に戻る */
   returnToMainLine: () => void;
 

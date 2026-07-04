@@ -407,7 +407,7 @@ export function extractEngineDataFromRecord(record: GameRecord): {
 
         const cand: Candidate = {
           id: candidateId,
-          score: score ?? (mate ? mate * 30000 : 0),
+          score: score ?? (mate ? (mate > 0 ? 30000 - mate : -30000 - mate) : 0),
           readMoves,
           formattedMoves: readMoves, // 将来的に変換可能
         };
@@ -416,7 +416,7 @@ export function extractEngineDataFromRecord(record: GameRecord): {
         if (candidateId === 1 || !topEvaluation) {
           topEvaluation = {
             ply,
-            score: score ?? (mate ? mate * 30000 : 0),
+            score: score ?? (mate ? (mate > 0 ? 30000 - mate : -30000 - mate) : 0),
             mate: mate ?? null,
           };
         }

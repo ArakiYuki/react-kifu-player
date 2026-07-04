@@ -19,6 +19,8 @@ export { useKifuPlayer } from './hooks/useKifuPlayer';
 export type { UseKifuPlayerOptions, UseKifuPlayerReturn } from './hooks/useKifuPlayer';
 export { useKeyboardNav } from './hooks/useKeyboardNav';
 export type { UseKeyboardNavOptions } from './hooks/useKeyboardNav';
+// v0.2.0
+export { useShogiProblem } from './hooks/useShogiProblem';
 
 // ---------------------------------------------------------------------------
 // Core utilities
@@ -28,6 +30,8 @@ export {
   detectFormat,
   extractEngineDataFromRecord 
 } from './core/parser';
+// v0.2.0
+export { extractProblemsFromKifu } from './utils/problemExtractor';
 
 // ---------------------------------------------------------------------------
 // Theme system
@@ -93,4 +97,17 @@ export type {
   MoveListProps,
   EvalGraphProps,
   ControlBarProps,
+
+  // v0.2.0: Interactive Board
+  BoardSquareCoord,
+  HandSquareCoord,
+  SquareClick,
+
+  // v0.2.0: Problem Types
+  ShogiProblem,
+  UseShogiProblemOptions,
+  UseShogiProblemReturn,
+  ProblemStatus,
+  ProblemResult,
+  ExtractProblemsOptions,
 } from './types';

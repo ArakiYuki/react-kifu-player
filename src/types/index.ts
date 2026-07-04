@@ -357,6 +357,31 @@ export type ShogiBoardProps = {
   width?: number | string;
   /** CSSクラス名 */
   className?: string;
+
+  // --- v0.2.0: インタラクティブ操作 (省略時は従来通り再生専用として動作) ---
+
+  /**
+   * ユーザーが駒を動かせるインタラクティブモードを有効にします。
+   * true の場合、onForward/onBackward によるクリック操作は無効になります。
+   * デフォルト: false
+   */
+  interactive?: boolean;
+  /**
+   * マスまたは持ち駒がクリックされた時に呼び出されます。
+   * interactive={true} の場合のみ有効です。
+   * useShogiProblem の handleSquareClick をそのまま渡せます。
+   */
+  onSquareClick?: (sq: SquareClick) => void;
+  /**
+   * 選択中のマス座標。このマスが選択状態（黄色ハイライト）で表示されます。
+   * useShogiProblem の selectedSquare をそのまま渡せます。
+   */
+  selectedSquare?: BoardSquareCoord | null;
+  /**
+   * 合法手のマス座標リスト。これらのマスが移動候補（薄い青丸）で表示されます。
+   * useShogiProblem の legalMoveSquares をそのまま渡せます。
+   */
+  highlightSquares?: BoardSquareCoord[];
 };
 
 /** MoveList コンポーネントのプロパティ */
@@ -410,3 +435,191 @@ export type ControlBarProps = {
   /** CSSクラス名 */
   className?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Interactive Board Types (v0.2.0)
+// ---------------------------------------------------------------------------
+
+/** 盤面上のマス座標 (インタラクティブ操作用) */
+export type BoardSquareCoord = {
+  /** 筋 (1-9, 1=一筋/右端) */
+  x: number;
+  /** 段 (1-9, 1=一段/上端) */
+  y: number;
+};
+
+/** 駒打ちの際に持ち駒エリアをクリックした場合の表現 */
+export type HandSquareCoord = {
+  /** 持ち駒エリアクリックであることを示す */
+  type: 'hand';
+  /** 手番 */
+  color: Color;
+  /** 駒種 */
+  piece: PieceKind;
+};
+
+/** ShogiBoard でのクリック対象 */
+export type SquareClick = BoardSquareCoord | HandSquareCoord;
+
+// ---------------------------------------------------------------------------
+// Problem Types (v0.2.0)
+// ---------------------------------------------------------------------------
+
+/**
+ * 次の一手問題の1件分のデータ構造。
+ * DBへの永続化や useShogiProblem への入力として使用します。
+ */
+export type ShogiProblem = {
+  /** 課題局面のSFEN文字列 */
+  sfen: string;
+  /** 自分の手番 (先手=black / 後手=white) */
+  playerColor: Color;
+  /**
+   * 正解の手のリスト (USI形式, 例: "7g7f")。
+   * AI候補手のうち、最善手との評価値差が correctMoveThreshold 以内の手を複数格納できます。
+   */
+  correctMoves: string[];
+  /** 正解手の読み筋（AIの出力） */
+  correctMoveCandidates?: Candidate[];
+  /** 当時実際に指した悪手 (USI形式) */
+  badMove: string;
+  /** 悪手を指した後の評価値 (先手視点) */
+  badMoveEval: number;
+  /** AIが示した最善手の評価値 (先手視点) */
+  bestMoveEval: number;
+  /** 評価値の落差 (badMoveEval - bestMoveEval, 負の値) */
+  evalDrop: number;
+  /** 元棋譜での手数 (参考情報) */
+  sourcePly?: number;
+};
+
+/** useShogiProblem フックへの入力オプション */
+export type UseShogiProblemOptions = {
+  /** 課題局面のSFEN文字列 */
+  sfen: string;
+  /** 自分の手番 */
+  playerColor: Color;
+  /**
+   * 正解の手のリスト (USI形式)。
+   * 配列内のいずれかの手を指した場合に「正解」となります。
+   */
+  correctMoves: string[];
+  /** 正解手の読み筋 */
+  correctMoveCandidates?: Candidate[];
+  /** 当時の悪手 (USI形式, 省略可)。指定時は結果比較情報が返されます */
+  badMove?: string;
+  /** 悪手評価値 (省略可) */
+  badMoveEval?: number;
+  /** 最善手評価値 (省略可) */
+  bestMoveEval?: number;
+};
+
+/** useShogiProblem フックの判定結果 */
+export type ProblemStatus = 'playing' | 'correct' | 'incorrect';
+
+/** ユーザーが手を指した後の結果比較情報 */
+export type ProblemResult = {
+  /** ユーザーが指した手 (USI形式) */
+  userMove: string;
+  /** ユーザーが指した手の日本語表記 (例: ７六歩) */
+  userMoveText?: string;
+  /** 当時の悪手 (USI形式) */
+  badMove: string;
+  /** 当時の悪手の日本語表記 */
+  badMoveText?: string;
+  /** 正解の手の一覧 (USI形式) */
+  correctMoves: string[];
+  /** 正解の手の日本語表記一覧 */
+  correctMovesText?: string[];
+  /** 正解手の読み筋 */
+  correctMoveCandidates?: Candidate[];
+  /** 悪手時の評価値 */
+  badMoveEval?: number;
+  /** 最善手の評価値 */
+  bestMoveEval?: number;
+  /**
+   * 評価値改善度 (正解した場合のみ)。
+   * bestMoveEval - badMoveEval の絶対値で、「悪手よりどれだけ良い手か」を示します。
+   */
+  evalImprovement?: number;
+};
+
+/** useShogiProblem フックの返り値 */
+export type UseShogiProblemReturn = {
+  /** 現在の局面 (ShogiBoard の position prop にそのまま渡せます) */
+  position: Position;
+  /** 最後に指された手の移動先座標 (ハイライト用) */
+  lastMove?: { from: Coordinate | null; to: Coordinate };
+  /** 問題の状態 */
+  status: ProblemStatus;
+  /** 選択中のマス座標 (null = 未選択) */
+  selectedSquare: BoardSquareCoord | null;
+  /** 選択中の駒が移動可能なマス座標のリスト */
+  legalMoveSquares: BoardSquareCoord[];
+  /**
+   * マスクリックハンドラ。ShogiBoard の onSquareClick prop にそのまま渡せます。
+   * 内部で合法手判定・正誤判定を行います。
+   */
+  handleSquareClick: (sq: SquareClick) => void;
+  /** 結果比較情報 (ユーザーが手を指した後に設定されます)。 */
+  result: ProblemResult | null;
+  /** 問題をリセットして最初からやり直します */
+  reset: () => void;
+
+  // --- 再生 (Playback) 関連 ---
+  /** 現在の再生状態 (null = 再生モードではない) */
+  playbackState: { currentPly: number; totalPlies: number } | null;
+  /** 読み筋 (Candidate) の再生を開始する */
+  startPlayback: (candidate: import('./index').Candidate) => void;
+  /** 再生モードを終了する */
+  stopPlayback: () => void;
+  /** 再生を1手進める */
+  forwardPlayback: () => void;
+  /** 再生を1手戻す */
+  backwardPlayback: () => void;
+
+  // --- 成り判定 (Promotion) 関連 ---
+  /** 成り・不成りの選択待ち状態 (null = 選択待ちではない) */
+  promotionPending: { from: BoardSquareCoord; to: BoardSquareCoord } | null;
+  /** 成り・不成りの選択を確定する */
+  resolvePromotion: (promote: boolean) => void;
+};
+
+// ---------------------------------------------------------------------------
+// Problem Extractor Types (v0.2.0)
+// ---------------------------------------------------------------------------
+
+/** extractProblemsFromKifu のオプション */
+export type ExtractProblemsOptions = {
+  /**
+   * 自分の手番 (先手=black / 後手=white)。
+   * この手番の局面のみ悪手判定の対象になります。
+   */
+  playerColor: Color;
+  /**
+   * 悪手判定の評価値落差しきい値 (正の値で指定)。
+   * 自分の手を指す前の最善手評価値から、指した後の評価値への落差がこの値以上の場合に悪手と判定します。
+   * デフォルト: 500
+   */
+  evalDropThreshold?: number;
+  /**
+   * 複数正解を許容する評価値の許容範囲 (正の値で指定)。
+   * AI候補手のうち、最善手の評価値との差がこの値以内の手を全て正解とします。
+   * デフォルト: 100
+   */
+  correctMoveThreshold?: number;
+  /**
+   * 抽出する問題の最大件数。
+   * 指定した場合、evalDrop の大きい順 (最悪手が先) に上位N件が返されます。
+   * デフォルト: 無制限
+   */
+  maxProblems?: number;
+  /**
+   * 問題抽出時に、手を指す前の自分視点の評価値がこの値以上であることを要求します。
+   * すでに不利な局面での悪手は問題にしたくない場合に使用します。
+   * 例: -200 を指定すると、自分から見て -200 以上（互角〜優勢）の局面のみ抽出されます。
+   * デフォルト: -200
+   */
+  minAdvantage?: number;
+};
+

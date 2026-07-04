@@ -2,7 +2,7 @@
 // Component: ShogiBoard - SVG-based shogi board
 // =============================================================================
 import React from 'react';
-import type { ShogiBoardProps, BoardTheme, PieceTheme, HandTheme, BoardPiece, PieceKind, Color, HandPieces } from '../../types';
+import type { ShogiBoardProps, BoardTheme, PieceTheme, HandTheme, BoardPiece, PieceKind, Color, HandPieces, BoardSquareCoord, SquareClick } from '../../types';
 import { useKifuTheme } from '../../themes';
 
 // ---------------------------------------------------------------------------
@@ -266,6 +266,54 @@ function HighlightSquare({
   );
 }
 
+/** 選択中マスのハイライト */
+function SelectedSquareHighlight({
+  x,
+  y,
+  cellSize,
+}: {
+  x: number;
+  y: number;
+  cellSize: number;
+}) {
+  return (
+    <rect
+      x={x + 1}
+      y={y + 1}
+      width={cellSize - 2}
+      height={cellSize - 2}
+      fill="rgba(255, 220, 0, 0.55)"
+      stroke="rgba(200, 160, 0, 0.8)"
+      strokeWidth={2}
+      rx={3}
+      pointerEvents="none"
+    />
+  );
+}
+
+/** 合法手のマスハイライト（青丸） */
+function LegalMoveDot({
+  x,
+  y,
+  cellSize,
+}: {
+  x: number;
+  y: number;
+  cellSize: number;
+}) {
+  return (
+    <circle
+      cx={x + cellSize / 2}
+      cy={y + cellSize / 2}
+      r={cellSize * 0.2}
+      fill="rgba(30, 120, 220, 0.35)"
+      stroke="rgba(30, 90, 180, 0.6)"
+      strokeWidth={1.5}
+      pointerEvents="none"
+    />
+  );
+}
+
 /** 持ち駒エリア */
 function HandDisplay({
   hand,
@@ -276,6 +324,9 @@ function HandDisplay({
   y,
   height,
   isBottom,
+  interactive,
+  onSquareClick,
+  selectedSquare,
 }: {
   hand: HandPieces;
   color: Color;
@@ -285,32 +336,26 @@ function HandDisplay({
   y: number;
   height: number;
   isBottom?: boolean;
+  interactive?: boolean;
+  onSquareClick?: (sq: SquareClick) => void;
+  selectedSquare?: SquareClick | null;
 }) {
   const isGote = color === 'white';
   const pieces: React.ReactNode[] = [];
 
   const labelText = isGote ? '☖後手' : '☗先手';
   
-  // 描画方向 (isBottomがtrueなら下から上へ)
-  const drawItems = [];
-  
+  // 描画する持ち駒のリストを作成
+  const drawItems: { kind: PieceKind; count: number }[] = [];
   for (const kind of HAND_ORDER) {
     const count = hand[kind];
     if (!count || count <= 0) continue;
-
-    const displayChar = PIECE_DISPLAY[kind as PieceKind] || '?';
-    const countStr = count > 1 ? KANJI_NUMS[count] : '';
-    drawItems.push(`${displayChar}${countStr}`);
-  }
-
-  const hasAny = drawItems.length > 0;
-  if (!hasAny) {
-    drawItems.push('なし');
+    drawItems.push({ kind, count });
   }
 
   // Y座標の計算
   let currentY = isBottom ? height - 20 : 20;
-  const direction = isBottom ? -22 : 22;
+  const direction = isBottom ? -32 : 32;
 
   // ラベルを描画
   pieces.push(
@@ -330,24 +375,76 @@ function HandDisplay({
 
   currentY += direction;
 
-  // 駒を描画
-  drawItems.forEach((item, index) => {
+  if (drawItems.length === 0) {
     pieces.push(
       <text
-        key={index}
+        key="empty"
         x={x + HAND_WIDTH / 2}
         y={y + currentY}
         textAnchor="middle"
-        fontSize={item === 'なし' ? handTheme.fontSize - 2 : handTheme.fontSize}
+        fontSize={handTheme.fontSize - 2}
         fill={handTheme.textColor}
-        opacity={item === 'なし' ? 0.5 : 1}
-        fontFamily={item === 'なし' ? "system-ui, sans-serif" : theme.fontFamily}
+        opacity={0.5}
+        fontFamily="system-ui, sans-serif"
       >
-        {item}
+        なし
       </text>
     );
-    currentY += direction;
-  });
+  } else {
+    // 駒を描画
+    drawItems.forEach((item, index) => {
+      const isSelected = selectedSquare && 'type' in selectedSquare && selectedSquare.type === 'hand' && selectedSquare.color === color && selectedSquare.piece === item.kind;
+      const pieceSize = 28;
+      const pieceX = x + 2;
+      const pieceY = y + currentY - pieceSize / 2;
+
+      pieces.push(
+        <g 
+          key={index}
+          style={{ cursor: interactive ? 'pointer' : 'default' }}
+          onClick={(e) => {
+            if (interactive && onSquareClick) {
+              e.stopPropagation();
+              onSquareClick({ type: 'hand', color, piece: item.kind });
+            }
+          }}
+        >
+          {/* 選択ハイライト */}
+          {isSelected && (
+            <rect
+              x={pieceX - 2}
+              y={pieceY - 2}
+              width={HAND_WIDTH - 4}
+              height={pieceSize + 4}
+              fill="rgba(255, 220, 0, 0.4)"
+              rx={4}
+            />
+          )}
+
+          <PieceCell
+            piece={{ kind: item.kind, color }}
+            theme={{ ...theme, fontScale: 0.8 }} // 少し小さめに
+            cellSize={pieceSize}
+            x={pieceX}
+            y={pieceY}
+          />
+          <text
+            x={pieceX + pieceSize + 4}
+            y={pieceY + pieceSize / 2}
+            textAnchor="start"
+            dominantBaseline="central"
+            fontSize={handTheme.fontSize}
+            fill={handTheme.textColor}
+            fontWeight="bold"
+            fontFamily="'Noto Sans JP', system-ui, sans-serif"
+          >
+            {item.count > 1 ? KANJI_NUMS[item.count] : ''}
+          </text>
+        </g>
+      );
+      currentY += direction;
+    });
+  }
 
   return <g>{pieces}</g>;
 }
@@ -364,7 +461,8 @@ export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; 
   const handTheme = props.handTheme || contextTheme.hand;
 
   const { position, lastMove, onForward, onBackward, className, showReverseButton, playerNameSente, playerNameGote } = props;
-  
+  const { interactive, onSquareClick, selectedSquare, highlightSquares } = props;
+
   const [internalReversed, setInternalReversed] = React.useState(false);
   const isReversed = props.reversed ?? internalReversed;
 
@@ -381,23 +479,49 @@ export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; 
 
   // クリックイベントのハンドリング
   const handleClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    // interactive モードの場合は、個別マスのクリックで処理するのでここでは何もしない
+    if (interactive) return;
     if (!onForward && !onBackward) return;
-    
+
     // 反転ボタンがクリックされた場合は何もしない
     if ((e.target as Element).closest?.('.reverse-btn')) {
       return;
     }
-    
+
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
-    
+
     // 盤面の中心を基準に右半分・左半分を判定
     if (clickX > rect.width / 2) {
       onForward?.();
     } else {
       onBackward?.();
     }
+  };
+
+  // インタラクティブモード: 盤面マスクリックのハンドラ
+  const handleBoardSquareClick = (x: number, y: number) => {
+    if (!interactive || !onSquareClick) return;
+    // isReversed時は座標を兄换
+    const coord: BoardSquareCoord = isReversed
+      ? { x: 10 - x, y: 10 - y }
+      : { x, y };
+    onSquareClick(coord);
+  };
+
+  // インタラクティブモード: 持ち駒クリックのハンドラ
+  const handleHandPieceClick = (color: Color, piece: PieceKind) => {
+    if (!interactive || !onSquareClick) return;
+    onSquareClick({ type: 'hand', color, piece });
+  };
+
+  // selectedSquare を SVG座標に変換
+  const getSquareSvgXY = (sq: BoardSquareCoord): { sx: number; sy: number } => {
+    if (isReversed) {
+      return { sx: (sq.x - 1) * CELL_SIZE, sy: (sq.y - 1) * CELL_SIZE };
+    }
+    return { sx: (9 - sq.x) * CELL_SIZE, sy: (sq.y - 1) * CELL_SIZE };
   };
 
   // 上下のプレイヤー名
@@ -477,7 +601,19 @@ export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; 
             </>
           )}
 
-          {/* 罫線 */}
+          {/* 選択中マスのハイライト (interactive モード) */}
+          {interactive && selectedSquare && (() => {
+            const { sx, sy } = getSquareSvgXY(selectedSquare);
+            return <SelectedSquareHighlight x={sx} y={sy} cellSize={CELL_SIZE} />;
+          })()}
+
+          {/* 合法手のマスハイライト (interactive モード) */}
+          {interactive && highlightSquares?.map(sq => {
+            const { sx, sy } = getSquareSvgXY(sq);
+            return <LegalMoveDot key={`legal-${sq.x}-${sq.y}`} x={sx} y={sy} cellSize={CELL_SIZE} />;
+          })}
+
+          {/* 罡線 */}
           <BoardGrid theme={boardTheme} />
 
           {/* 駒 */}
@@ -496,6 +632,31 @@ export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; 
               );
             })
           )}
+
+          {/* インタラクティブモード: 透明クリックグリッド */}
+          {interactive && (
+            <g>
+              {Array.from({ length: BOARD_CELLS }, (_, row) =>
+                Array.from({ length: BOARD_CELLS }, (_, col) => {
+                  // SVG座標から将棋座標に変換
+                  const fileX = isReversed ? col + 1 : 9 - col;
+                  const rankY = isReversed ? 9 - row : row + 1;
+                  return (
+                    <rect
+                      key={`grid-${row}-${col}`}
+                      x={col * CELL_SIZE}
+                      y={row * CELL_SIZE}
+                      width={CELL_SIZE}
+                      height={CELL_SIZE}
+                      fill="transparent"
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); handleBoardSquareClick(fileX, rankY); }}
+                    />
+                  );
+                })
+              )}
+            </g>
+          )}
         </g>
 
         {/* ラベル (ラベルは回転させないため別処理) */}
@@ -512,6 +673,9 @@ export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; 
         y={boardY}
         height={boardPixels}
         isBottom={isReversed}
+        interactive={interactive}
+        onSquareClick={onSquareClick}
+        selectedSquare={selectedSquare}
       />
 
       {/* 先手持ち駒 */}
@@ -524,6 +688,9 @@ export function ShogiBoard(props: ShogiBoardProps & { playerNameSente?: string; 
         y={boardY}
         height={boardPixels}
         isBottom={!isReversed}
+        interactive={interactive}
+        onSquareClick={onSquareClick}
+        selectedSquare={selectedSquare}
       />
       
       {/* 盤面反転ボタン */}
