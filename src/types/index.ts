@@ -548,8 +548,10 @@ export type ProblemResult = {
 export type UseShogiProblemReturn = {
   /** 現在の局面 (ShogiBoard の position prop にそのまま渡せます) */
   position: Position;
-  /** 最後に指された手の移動先座標 (ハイライト用) */
-  lastMove?: { from: Coordinate | null; to: Coordinate };
+  /** 最後に指された手の座標 (ハイライト用) */
+  lastMove: { from: Coordinate | null; to: Coordinate } | null;
+  /** 現在の局面のSFEN文字列 */
+  sfen: string;
   /** 問題の状態 */
   status: ProblemStatus;
   /** 選択中のマス座標 (null = 未選択) */

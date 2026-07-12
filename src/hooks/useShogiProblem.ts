@@ -20,6 +20,7 @@ import type {
   HandPieces,
   Coordinate,
 } from '../types';
+import { positionToSFEN } from '../utils/sfen';
 
 // ---------------------------------------------------------------------------
 // tsshogi Position ユーティリティ
@@ -441,8 +442,9 @@ export function useShogiProblem(options: UseShogiProblemOptions): UseShogiProble
 
   return {
     position,
-    lastMove: displayLastMove,
+    lastMove: displayLastMove || null,
     status,
+    sfen: positionToSFEN(position, playbackMoves ? playbackPly : 0),
     selectedSquare,
     legalMoveSquares,
     handleSquareClick,
