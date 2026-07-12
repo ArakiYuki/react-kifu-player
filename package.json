@@ -1,6 +1,6 @@
 {
   "name": "react-kifu-player",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "A rich, customizable React component library for Shogi kifu (game record) playback with evaluation graphs, branching, and theme support.",
   "homepage": "https://arakiyuki.github.io/react-kifu-player/",
   "type": "module",
