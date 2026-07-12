@@ -1,6 +1,7 @@
 // =============================================================================
 // Hook: useKifuPlayer - Main integration hook
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { positionToSFEN } from '../utils/sfen';
 import { parseKifu, extractEngineDataFromRecord, parseVariationMoves } from '../core/parser';
 import {
   createInitialState,
@@ -44,6 +45,8 @@ export type UseKifuPlayerReturn = {
   currentMove: Move | null;
   /** 最終手の座標 (ハイライト用) */
   lastMoveCoords: { from: Coordinate | null; to: Coordinate } | null;
+  /** 現在局面のSFEN文字列 */
+  sfen: string;
 
   // --- 操作 ---
   /** 1手進む */
@@ -342,6 +345,8 @@ export function useKifuPlayer(
     goToEnd,
     playVariation,
     returnToMainLine,
+
+    sfen: positionToSFEN(state.position, state.currentPly + 1),
 
     // 棋譜情報
     record: activeRecord || record,

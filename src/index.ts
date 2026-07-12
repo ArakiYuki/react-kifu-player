@@ -32,6 +32,7 @@ export {
 } from './core/parser';
 // v0.2.0
 export { extractProblemsFromKifu } from './utils/problemExtractor';
+export { positionToSFEN } from './utils/sfen';
 
 // ---------------------------------------------------------------------------
 // Theme system
