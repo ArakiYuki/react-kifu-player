@@ -42,6 +42,9 @@ const config: Config = {
   ],
 
   themeConfig: {
+    metadata: [
+      { name: 'google-site-verification', content: 'KmHU7oJ1Mv5bUYqFEE2ApFbwtZ8Yro61AU2fwPPBC2Y' }
+    ],
     colorMode: {
       respectPrefersColorScheme: true,
     },
